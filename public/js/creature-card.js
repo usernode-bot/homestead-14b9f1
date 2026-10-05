@@ -4,12 +4,17 @@
 //   for Collection and later the Marketplace, contests and Breeding.
 // - hero(c, opts): the large panel at the top of a Creature's profile.
 // - statsList(c) / identityList(c): the base stats and the permanent identity.
+// - feedingSection(c, opts) / trainingSection(c, opts): hunger and condition
+//   with the owner's FEED control; base, training and effective stats with
+//   the owner's TRAIN controls. Every number comes from the server; the costs
+//   and limits are read from care-config.js.
 //
 // The name is the one thing a person types, so it is never written into this
 // HTML: each place it shows is a <span data-creature-name="<id>">, filled in
 // as text by app.js.
 (function () {
   var cfg = window.HOMESTEAD_CREATURE_CONFIG;
+  var care = window.HOMESTEAD_CARE_CONFIG;
   var artwork = window.HOMESTEAD_CREATURE_ART;
 
   function label(list, id) {
@@ -103,19 +108,131 @@
     '</ul>';
   }
 
-  // The whole profile: hero, then stats and identity side by side.
+  function statLabel(key) {
+    var s = cfg.STATS.find(function (x) { return x.key === key; });
+    return s ? s.label : key;
+  }
+
+  // What the last Feed or Train did, as a short status line.
+  function noticeText(n) {
+    if (!n) return '';
+    if (n.kind === 'fed') return 'Fed! +' + Number(n.restored) + ' Hunger, -' + Number(n.fodderSpent) + ' Fodder';
+    if (n.kind === 'trained') return 'Trained! +' + Number(n.amount) + ' ' + statLabel(n.stat) + ', -' + Number(n.cost) + ' STEAD';
+    return '';
+  }
+
+  // Hunger and condition, and for the owner the Fodder on hand and FEED.
+  // opts: { canAct, controls, pending, notice, error }
+  function feedingSection(c, opts) {
+    opts = opts || {};
+    var k = c.care || { hunger: care.HUNGER_MAX, hungerState: 'WELL_FED', hungerLabel: 'WELL FED', condition: 'GOOD' };
+    var max = care.HUNGER_MAX;
+    var pct = Math.max(0, Math.min(100, (k.hunger / max) * 100));
+    var rows =
+      '<li class="list-row flex-col items-stretch gap-2">' +
+        '<span class="flex items-baseline justify-between gap-3">' +
+          '<span class="text-small font-bold">HUNGER</span>' +
+          '<span class="font-bold tabular-nums" data-hunger="' + Number(k.hunger) + '">' + Number(k.hunger) + ' / ' + max + '</span>' +
+        '</span>' +
+        '<span class="h-2 overflow-hidden rounded-full bg-raised" role="progressbar" aria-label="Hunger" aria-valuemin="0" aria-valuemax="' + max + '" aria-valuenow="' + Number(k.hunger) + '">' +
+          '<span class="block h-full rounded-full ' + (k.hungerState === 'WELL_FED' ? 'bg-accent' : k.hungerState === 'HUNGRY' ? 'bg-punk' : 'bg-danger') + '" style="width:' + pct + '%"></span>' +
+        '</span>' +
+        '<span class="text-body font-black" data-hunger-state="' + k.hungerState + '">' + k.hungerLabel + '</span>' +
+      '</li>' +
+      '<li class="list-row justify-between gap-4"><span class="text-muted">Condition</span>' +
+        '<span class="font-bold" data-condition="' + k.condition + '">' + k.condition + '</span></li>' +
+      '<li class="list-row justify-between gap-4"><span class="text-muted">Work output</span>' +
+        '<span class="font-bold tabular-nums" data-work-efficiency>' + Math.round(care.efficiency(k.hunger) * 100) + '%</span></li>';
+
+    if (opts.canAct) {
+      var ctl = opts.controls;
+      var full = k.hunger >= max;
+      var fodder = ctl ? Number(ctl.fodder) || 0 : null;
+      var short = ctl && fodder < care.FEED_FODDER_COST;
+      var busy = !!opts.pending;
+      var why = !ctl ? '' : full ? 'Already Full' : short ? 'Need ' + care.FEED_FODDER_COST + ' Fodder' : '';
+      rows +=
+        '<li class="list-row flex-col items-stretch gap-3" data-feeding>' +
+          '<span class="flex items-baseline justify-between gap-3">' +
+            '<span class="text-small font-bold">FODDER</span>' +
+            '<span class="font-bold tabular-nums" data-fodder="' + (ctl ? fodder : '') + '">' + (ctl ? fodder : '…') + '</span>' +
+          '</span>' +
+          '<p class="text-small text-muted">Feeding uses ' + care.FEED_FODDER_COST + ' Fodder for +' + care.FEED_HUNGER_RESTORE + ' Hunger. Farmers bring Fodder home from Work.</p>' +
+          '<button type="button" class="btn-primary" data-action="feed"' + (!ctl || full || short || busy ? ' disabled' : '') + '>' +
+            (opts.pending === 'feed' ? 'FEEDING…' : 'FEED') + '</button>' +
+          (why ? '<p class="text-small font-bold text-muted" data-feed-blocked>' + why + '</p>' : '') +
+          (opts.notice && opts.notice.kind === 'fed' ? '<p class="text-small font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p>' : '') +
+        '</li>';
+    }
+    return '<section data-hunger-section><h3 class="section-label">Hunger</h3><ul class="list">' + rows + '</ul></section>';
+  }
+
+  // Base, training and effective stats; for the owner a TRAIN button on each.
+  // data-stat keeps the base value. opts as feedingSection.
+  function trainingSection(c, opts) {
+    opts = opts || {};
+    var ctl = opts.canAct ? opts.controls : null;
+    var bonus = c.trainingBonus || {};
+    var effective = care.effectiveStats(c);
+    var working = !!(ctl && ctl.working);
+    var poor = !!(ctl && Number(ctl.steadBalance) < care.TRAINING_COST);
+    var busy = !!opts.pending;
+    var head = '';
+    if (opts.canAct) {
+      head =
+        '<li class="list-row flex-wrap justify-between gap-x-4 gap-y-1">' +
+          '<span class="text-body font-bold" data-training-cost>Cost: ' + care.TRAINING_COST + ' STEAD per +' + care.TRAINING_AMOUNT + '</span>' +
+          '<span class="text-small text-muted">You have <span class="font-bold tabular-nums text-fg" data-training-stead>' + (ctl ? Number(ctl.steadBalance).toLocaleString('en-US') : '…') + '</span> STEAD</span>' +
+        '</li>' +
+        (working ? '<li class="list-row"><p class="text-body font-bold" data-training-blocked="working">Creature is working. Training unavailable.</p></li>'
+          : poor ? '<li class="list-row"><p class="text-body text-muted" data-training-blocked="stead">Need ' + care.TRAINING_COST + ' STEAD to train. Daily Check-in on Home pays STEAD.</p></li>' : '') +
+        (opts.notice && opts.notice.kind === 'trained' ? '<li class="list-row"><p class="text-body font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p></li>' : '');
+    }
+    var rows = cfg.STATS.map(function (s) {
+      var base = Number(c.stats && c.stats[s.key]) || 0;
+      var b = Number(bonus[s.key]) || 0;
+      var atMax = b >= care.MAX_TRAINING_BONUS;
+      var button = '';
+      if (opts.canAct) {
+        var pending = opts.pending === 'train:' + s.key;
+        button = '<button type="button" class="btn-secondary w-full whitespace-nowrap px-3 sm:w-40" data-action="train" data-stat="' + s.key + '"' +
+          ' aria-label="Train ' + s.label + ' for ' + care.TRAINING_COST + ' STEAD"' +
+          (!ctl || atMax || working || poor || busy ? ' disabled' : '') + '>' +
+          (atMax ? 'MAX TRAINING' : pending ? 'TRAINING…' : '+ TRAIN') + '</button>';
+      }
+      return '<li class="list-row flex-wrap gap-x-4 gap-y-2" data-training-stat="' + s.key + '">' +
+        '<span class="w-20 shrink-0 text-small font-bold">' + s.label.toUpperCase() + '</span>' +
+        '<dl class="grid flex-1 grid-cols-3 gap-2 text-small">' +
+          '<div><dt class="text-muted">Base</dt><dd class="font-bold tabular-nums" data-stat="' + s.key + '">' + base + '</dd></div>' +
+          '<div><dt class="text-muted">Training</dt><dd class="font-bold tabular-nums" data-training-bonus="' + s.key + '">+' + b + '</dd></div>' +
+          '<div><dt class="text-muted">Effective</dt><dd class="text-body font-black tabular-nums" data-effective-stat="' + s.key + '">' + effective[s.key] + '</dd></div>' +
+        '</dl>' +
+        button +
+      '</li>';
+    }).join('');
+    return '<section data-training><h3 class="section-label">' + (opts.canAct ? 'Stats and training' : 'Stats') + '</h3>' +
+      '<ul class="list" data-stats>' + head + rows + '</ul>' +
+      (opts.canAct ? '<p class="mt-2 px-1 text-small text-muted">Each stat can gain up to +' + care.MAX_TRAINING_BONUS + ' from training. Base stats never change.</p>' : '') +
+    '</section>';
+  }
+
+  // The whole profile: hero; hunger and identity side by side; then stats
+  // and training. opts: { canRename, canAct, controls, pending, notice, error }
   function profile(c, opts) {
+    opts = opts || {};
     return '<div class="max-w-3xl" data-creature-profile="' + Number(c.creatureId) + '">' +
       hero(c, opts) +
+      (opts.error ? '<p role="alert" class="mt-4 px-1 text-small text-danger" data-field="care-error"></p>' : '') +
       '<div class="mt-8 grid gap-6 md:grid-cols-2">' +
-        '<section><h3 class="section-label">Base stats</h3>' + statsList(c) + '</section>' +
+        feedingSection(c, opts) +
         '<section><h3 class="section-label">Identity</h3>' + identityList(c) + '</section>' +
       '</div>' +
+      '<div class="mt-8">' + trainingSection(c, opts) + '</div>' +
     '</div>';
   }
 
   window.HOMESTEAD_CREATURE_CARD = {
     formatId: formatId, card: card, hero: hero, profile: profile,
-    statsList: statsList, identityList: identityList, art: art, rarityBadge: rarityBadge, nameSpan: nameSpan,
+    statsList: statsList, identityList: identityList, feedingSection: feedingSection, trainingSection: trainingSection, art: art, rarityBadge: rarityBadge, nameSpan: nameSpan,
   };
 })();

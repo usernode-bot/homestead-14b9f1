@@ -30,8 +30,19 @@
       creature: null, // this wallet's Genesis Creature (lib/creatures.js shape)
       // Every Creature this wallet owns (creatures.js).
       collection: { status: 'idle', creatures: [] }, // status: 'idle' | 'loading' | 'ready' | 'error'
-      // The Creature open at /creature/<id> (creatures.js).
-      viewedCreature: { status: 'idle', id: null, creature: null, ownedByYou: false }, // status adds 'missing'
+      // The Creature open at /creature/<id>, or this wallet's own at /creature
+      // (creatures.js). controls is what its owner's Feed and Train need
+      // (lib/care.js controls shape), null for anyone else.
+      viewedCreature: {
+        status: 'idle', // 'idle' | 'loading' | 'ready' | 'error' | 'missing'
+        id: null,
+        creature: null,
+        ownedByYou: false,
+        controls: null,
+        pending: null, // 'feed' | 'train:<stat>' while a request is in flight
+        notice: null, // what the last Feed or Train did: { kind, ... }
+        error: null, // what the last Feed or Train could not do
+      },
       seed: null, // this wallet's Genesis Seed
       // This wallet's Homestead and the Creature living in it (homestead.js,
       // lib/homestead.js shape). key is the wallet and Creature it was opened for.

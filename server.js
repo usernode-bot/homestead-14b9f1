@@ -7,6 +7,7 @@ const creatures = require('./lib/creatures');
 const homestead = require('./lib/homestead');
 const work = require('./lib/work');
 const stead = require('./lib/stead');
+const care = require('./lib/care');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -186,7 +187,7 @@ function genesisWallet(req) {
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -227,7 +228,7 @@ app.post('/api/genesis/awaken', async (req, res) => {
 // app: a Creature is a public collectible. Renaming needs the owner's wallet.
 app.get('/api/creatures', async (req, res) => {
   try {
-    res.json({ creatures: await creatures.listOwned(pool, genesisWallet(req)) });
+    res.json({ creatures: await creatures.listOwned(pool, genesisWallet(req), req.now) });
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -245,10 +246,12 @@ app.get('/api/creatures/:id', async (req, res) => {
   const id = creatureIdParam(req);
   if (!id) return res.json({ creature: null, ownedByYou: false });
   try {
-    const creature = await creatures.getById(pool, id);
+    const creature = await creatures.getById(pool, id, req.now);
     if (!creature) return res.json({ creature: null, ownedByYou: false });
     const wallet = genesisWallet(req);
-    res.json({ creature, ownedByYou: !!wallet && creature.owner === wallet });
+    const ownedByYou = !!wallet && creature.owner === wallet;
+    // The owner also gets what the Feed and Train controls need.
+    res.json({ creature, ownedByYou, controls: ownedByYou ? await care.controls(pool, wallet, id, req.now) : null });
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -266,6 +269,35 @@ app.post('/api/creatures/:id/name', async (req, res) => {
   }
 });
 
+// Feeding + Training (lib/care.js). The owner only, one transaction each.
+// requestId is made once per tap by the page: a retry or a duplicate of the
+// same tap is answered with the current state (replayed: true) and changes
+// nothing. Both answer { creature, controls } so the page shows one truth.
+app.post('/api/creatures/:id/feed', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const id = creatureIdParam(req);
+  if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+  try {
+    res.json(await care.feed(pool, wallet, id, req.body && req.body.requestId, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/creatures/:id/train', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const id = creatureIdParam(req);
+  if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+  const body = req.body || {};
+  try {
+    res.json(await care.train(pool, wallet, id, String(body.stat || ''), body.requestId, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
 // Homesteads (lib/homestead.js). Opening your own needs a linked wallet: it
 // is created the first time that wallet owns a Creature, and the Creature in
 // it is always the one the wallet owns now (checked on the server, never
@@ -273,7 +305,9 @@ app.post('/api/creatures/:id/name', async (req, res) => {
 // This wallet's Homestead with its Work (lib/work.js). Opening it settles
 // Work whose time is up, rolling its rewards once.
 async function ownHomestead(wallet, now) {
-  const opened = await homestead.open(pool, wallet);
+  // Save the Creature's hunger as of now (lib/care.js) before showing it.
+  await care.syncHunger(pool, wallet, now);
+  const opened = await homestead.open(pool, wallet, now);
   opened.work = opened.homestead
     ? await work.overview(pool, opened.homestead.homesteadId, now, { settle: true })
     : null;
@@ -297,7 +331,7 @@ app.get('/api/homesteads/:id', async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) return res.json({ homestead: null, creature: null, work: null, ownedByYou: false });
   try {
-    const found = await homestead.getById(pool, id);
+    const found = await homestead.getById(pool, id, req.now);
     if (!found) return res.json({ homestead: null, creature: null, work: null, ownedByYou: false });
     const wallet = genesisWallet(req);
     found.work = await work.overview(pool, id, req.now, { settle: false });
@@ -490,6 +524,7 @@ async function start() {
   await homestead.ensureSchema(pool);
   await work.ensureSchema(pool);
   await stead.ensureSchema(pool);
+  await care.ensureSchema(pool);
   if (IS_STAGING) await seedStaging().catch((err) => console.warn('[staging seed]', err.message));
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.

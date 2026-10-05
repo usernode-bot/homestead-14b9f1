@@ -95,6 +95,7 @@
       'genesis-error': state.genesis.error || '',
       'work-error': state.homestead.error || '',
       'stead-error': state.stead.error || '',
+      'care-error': state.viewedCreature.error || '',
     };
     document.querySelectorAll('[data-field]').forEach(function (el) {
       el.textContent = values[el.dataset.field] || '';
@@ -115,10 +116,29 @@
     return state.creature && state.creature.creatureId === id ? state.creature : null;
   }
 
+  // On /creature, the id of this wallet's own Creature, or null.
+  function ownCreatureId(route) {
+    var state = store.get();
+    if (route.key !== 'creature' || state.wallet.status !== 'connected' || !state.creature) return null;
+    return state.creature.owner === state.genesis.walletId ? state.creature.creatureId : null;
+  }
+
+  // Coming back to a Creature's profile reloads it quietly, so hunger and the
+  // Feed and Train controls are current (Work may have started meanwhile).
+  function refreshCreature() {
+    var route = currentRoute();
+    var id = route.creatureId || ownCreatureId(route);
+    if (id && store.get().viewedCreature.id === id && store.get().viewedCreature.status === 'ready') creatures.view(id, true, true);
+  }
+
   function render() {
     var route = currentRoute();
     // Starts the load (which re-renders) only when this Creature isn't showing.
     if (route.creatureId) creatures.view(route.creatureId);
+    // My Creature loads the same way, for its Feed and Train controls (once:
+    // a failed load keeps showing the Creature without them).
+    var ownId = ownCreatureId(route);
+    if (ownId && store.get().viewedCreature.id !== ownId) creatures.view(ownId);
     if (route.homesteadId) homesteads.view(route.homesteadId);
     // Opens this wallet's Homestead (which re-renders) only when it isn't
     // already open for this wallet and Creature. Never during the render itself.
@@ -136,6 +156,7 @@
     // Keep the query (the Homeroom token, theme and preview parameters).
     history.pushState(null, '', path + window.location.search);
     walletMenuOpen = false;
+    refreshCreature();
     render();
     window.scrollTo(0, 0);
     viewEl.focus({ preventScroll: true });
@@ -166,6 +187,8 @@
       else if (name === 'work-start') homesteads.startWork(Number(action.dataset.creatureId), action.dataset.duration, action.dataset.building);
       else if (name === 'work-collect') homesteads.collect(Number(action.dataset.workId));
       else if (name === 'work-collect-pending') homesteads.collectPending();
+      else if (name === 'feed') creatures.feed();
+      else if (name === 'train') creatures.train(action.dataset.stat);
       else if (name === 'rename') {
         var holder = action.closest('[data-creature-id]');
         creatures.openRename(holder && creatureFor(Number(holder.dataset.creatureId)));
@@ -181,7 +204,7 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && walletMenuOpen) { walletMenuOpen = false; render(); }
   });
-  window.addEventListener('popstate', render);
+  window.addEventListener('popstate', function () { refreshCreature(); render(); });
   store.subscribe(render);
 
   render();

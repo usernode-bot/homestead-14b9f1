@@ -362,10 +362,25 @@
       '</section>';
   }
 
+  // The profile options for the Creature open in viewedCreature: its owner
+  // can rename, feed and train it.
+  function profileOpts(v, mine) {
+    return {
+      canRename: mine, canAct: mine, controls: v.controls,
+      pending: v.pending, notice: v.notice, error: v.error,
+    };
+  }
+
   function creature(state, route) {
     var c = state.creature;
     if (ownsGenesisCreature(state)) {
-      return pageHeading(route) + cards.profile(c, { canRename: true });
+      // app.js loads it into viewedCreature for its Feed and Train controls;
+      // until then it shows with those controls waiting.
+      var v = state.viewedCreature;
+      if (v.id === c.creatureId && v.status === 'ready' && v.creature) {
+        return pageHeading(route) + cards.profile(v.creature, profileOpts(v, v.ownedByYou));
+      }
+      return pageHeading(route) + cards.profile(c, { canRename: true, canAct: true, controls: null });
     }
     var hasSeed = state.wallet.status === 'connected' && state.seed && !c;
     return placeholder(route, 'No Creature yet.', hasSeed
@@ -455,7 +470,7 @@
     var v = state.viewedCreature;
     var mine = v.status === 'ready' && v.ownedByYou && state.wallet.status === 'connected';
     var heading = pageHeading(mine ? route : { key: 'creature', label: 'CREATURE' });
-    if (v.status === 'ready' && v.creature) return heading + cards.profile(v.creature, { canRename: mine });
+    if (v.status === 'ready' && v.creature) return heading + cards.profile(v.creature, profileOpts(v, mine));
     if (v.status === 'missing') {
       return heading +
         '<section class="collectible state-empty py-14" data-empty="creature-missing">' +
