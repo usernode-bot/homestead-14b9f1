@@ -58,7 +58,7 @@ test('Gear in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query(`DROP TABLE IF EXISTS gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts,
+    await pool.query(`DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts,
       creature_work, homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE`);
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
@@ -66,6 +66,7 @@ test('Gear in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
     await stead.ensureSchema(pool);
     await careLib.ensureSchema(pool);
     await gear.ensureSchema(pool); // idempotent
+    await require('../lib/contests').ensureSchema(pool);
   }
   async function creatureFor(wallet) {
     const m = await genesis.mint(pool, wallet, wallet);

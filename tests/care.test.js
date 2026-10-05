@@ -71,7 +71,7 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query(`DROP TABLE IF EXISTS gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts, creature_work,
+    await pool.query(`DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts, creature_work,
       homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE`);
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
@@ -79,6 +79,7 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
     await stead.ensureSchema(pool);
     await care.ensureSchema(pool);
     await care.ensureSchema(pool); // idempotent
+    await require('../lib/contests').ensureSchema(pool);
   }
   const T0 = new Date('2026-10-05T10:00:00Z');
   const at = (hours) => new Date(T0.getTime() + hours * HOUR);

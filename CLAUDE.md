@@ -82,7 +82,7 @@ PR #1 built the foundation: navigation, the wallet area, the Home screen and
 placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). PR #3 made
 the Creature a full collectible (below). PR #4 added the Homestead; PR #5 Work
 & Resources (below); PR #6 STEAD Points and Daily Check-in (below); PR #7
-Feeding + Training (below); PR #8 Gear (below). Listings, breeding, Gear
+Feeding + Training (below); PR #8 Gear (below); PR #9 Contests (below). Listings, breeding, Gear
 crafting or trading, other STEAD spending and transactions do not exist yet,
 and none may be faked.
 
@@ -149,6 +149,23 @@ and none may be faked.
   is no Weapon slot. Gear comes only from the once-per-wallet starter kit for
   now. Slots, stats and the catalog are only in `public/js/gear-config.js`;
   care-config.js `gearBonus` adds equipped Gear into `effectiveStat`.
+- **Contests:** player-vs-player head-to-head play, built as a non-violent
+  trick-off (content rules: never "battle", "attack" as an action, "damage" or
+  "defeated" in copy). `lib/contests.js` owns it: a challenge
+  (`contest_challenges`) is between two different wallets and moves once
+  from PENDING (trigger), under a row lock, so two tabs or a cancel racing an
+  accept end in one state. Accepting creates the one Contest for it
+  (`contests.challenge_id` UNIQUE), locks both Creatures
+  (`contest_creature_locks`, PK per Creature; `lib/contest-locks.js` is what
+  Work, Training and Gear check) and saves a snapshot of both (effective
+  stats via care-config.js, condition, Gear ids). After
+  `CONTEST_DURATION_SECONDS` the first request resolves it once from the
+  snapshots, stores the log and result, pays CONTEST_REWARD through
+  `creditStead` keyed `CONTEST-<id>` (once per wallet) and releases the locks;
+  a completed Contest is frozen. Ownership and permanent stats never change.
+  Every value and formula is in `public/js/contest-config.js`. The opponent
+  is a wallet address, or a Homeroom username resolved through the platform
+  directory to the wallet that user used Genesis with.
 - **Supply cap:** there can never be more than 5,000 Creatures.
   `MAX_CREATURE_SUPPLY` in `public/js/config.js` is the only place that number
   is written. The page reads it as `window.HOMESTEAD_CONFIG`, the server as
@@ -164,8 +181,8 @@ and none may be faked.
   it falls back to a random mock address.
 - **Screens:** `public/js/screens.js` (one render function per route),
   `public/js/app.js` (router, nav, wallet area). Routes are clean paths
-  (`/`, `/creature`, `/homestead`, `/marketplace`, `/collection`, `/profile`,
-  and `/gear` under HOMESTEAD);
+  (`/`, `/creature`, `/homestead`, `/contests`, `/marketplace`, `/collection`,
+  `/profile`, `/gear` under HOMESTEAD, `/contests/<id>` under CONTESTS);
   the server's catch-all serves `index.html` for each.
 - **Content rules:** Homeroom apps may not include combat or fantasy violence,
   so head-to-head play is called "compete"/"contests", not battles. Design it

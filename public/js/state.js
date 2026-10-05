@@ -39,6 +39,7 @@
         creature: null,
         ownedByYou: false,
         controls: null,
+        contest: null, // whether it can compete: lib/contests.js availability shape
         pending: null, // 'feed' | 'train:<stat>' while a request is in flight
         notice: null, // what the last Feed or Train did: { kind, ... }
         error: null, // what the last Feed or Train could not do
@@ -88,7 +89,25 @@
         notice: null, // what the last claim, equip or unequip did: { kind, ... }
         error: null, // what the last one could not do
       },
-      contests: null, // head-to-head play (see CLAUDE.md content rules)
+      // Head-to-head Contests between two players (contests.js,
+      // lib/contests.js overview shape). Non-violent trick-offs, see CLAUDE.md
+      // content rules. Every result is the server's; viewed is the Contest
+      // open at /contests/<id>. clockOffset: server clock minus this device's.
+      contests: {
+        status: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
+        walletId: null,
+        incoming: [], // PENDING challenges for this wallet
+        outgoing: [], // this wallet's challenges: pending, and answered in the last day
+        active: [], // running Contests
+        history: [], // the latest finished Contests, newest first
+        creatures: [], // this wallet's Creatures with their availability
+        clockOffset: 0,
+        accepting: null, // the challengeId whose Creature picker is open
+        pending: null, // 'challenge' | 'accept:<id>' | 'decline:<id>' | 'cancel:<id>' while in flight
+        notice: null, // what just happened, as one line
+        error: null, // what the last request could not do
+        viewed: { status: 'idle', id: null, contest: null, walletId: null, clockOffset: 0 }, // status adds 'missing'
+      },
       marketplace: { listings: [] },
       breeding: null,
     };

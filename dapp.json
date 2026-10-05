@@ -145,7 +145,9 @@
         "public/js/care-config.js",
         "lib/care.js",
         "public/js/gear*.js",
-        "lib/gear.js"
+        "lib/gear.js",
+        "lib/contest*.js",
+        "public/js/contest*.js"
       ]
     },
     {
@@ -189,6 +191,39 @@
       "path": "/profile",
       "expectSelector": "[data-empty=\"profile\"]",
       "expectText": "Connect your wallet to view your profile."
+    },
+    {
+      "name": "Contests asks to connect a wallet",
+      "path": "/contests",
+      "expectSelector": "[data-empty=\"contests\"] [data-action=\"connect\"]",
+      "expectText": "Connect your wallet to compete."
+    },
+    {
+      "id": "contests.result",
+      "name": "A finished contest shows its winner, totals and the shared log",
+      "path": "/contests/900001",
+      "expectSelector": "[data-contest=\"900001\"][data-contest-status=\"COMPLETED\"] [data-contest-log] [data-log-kind=\"win\"]",
+      "expectText": "WINNER",
+      "visual": true,
+      "impact": [
+        "public/js/contest*.js",
+        "public/js/screens.js",
+        "public/js/app.js",
+        "lib/contest*.js",
+        "styles/**"
+      ]
+    },
+    {
+      "name": "An unknown contest number shows not found",
+      "path": "/contests/999999",
+      "expectSelector": "[data-empty=\"contest-missing\"]",
+      "expectText": "No contest has that number."
+    },
+    {
+      "name": "A Creature's profile shows whether it can compete",
+      "path": "/creature/1",
+      "expectSelector": "[data-creature-profile] [data-contest-section] [data-contest-availability]",
+      "expectText": "Contests"
     }
   ]
 }

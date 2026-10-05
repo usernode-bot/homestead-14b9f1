@@ -30,6 +30,8 @@
   var TYPES = Object.freeze({
     DAILY_CHECKIN: Object.freeze({ label: 'Daily Check-in', direction: 'credit', active: true }),
     TRAINING: Object.freeze({ label: 'Training', direction: 'debit', active: true }),
+    // Paid once per Contest and wallet when it is resolved (lib/contests.js).
+    CONTEST_REWARD: Object.freeze({ label: 'Contest Reward', direction: 'credit', active: true }),
     FEEDING: Object.freeze({ label: 'Feeding', direction: 'debit', active: false }),
     GEAR: Object.freeze({ label: 'Gear', direction: 'debit', active: false }),
     UPGRADE: Object.freeze({ label: 'Homestead Upgrade', direction: 'debit', active: false }),

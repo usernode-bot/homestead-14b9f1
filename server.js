@@ -9,6 +9,7 @@ const work = require('./lib/work');
 const stead = require('./lib/stead');
 const care = require('./lib/care');
 const gear = require('./lib/gear');
+const contests = require('./lib/contests');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -188,7 +189,7 @@ function genesisWallet(req) {
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError || err instanceof gear.GearError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError || err instanceof gear.GearError || err instanceof contests.ContestError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -251,8 +252,14 @@ app.get('/api/creatures/:id', async (req, res) => {
     if (!creature) return res.json({ creature: null, ownedByYou: false });
     const wallet = genesisWallet(req);
     const ownedByYou = !!wallet && creature.owner === wallet;
-    // The owner also gets what the Feed and Train controls need.
-    res.json({ creature, ownedByYou, controls: ownedByYou ? await care.controls(pool, wallet, id, req.now) : null });
+    // The owner also gets what the Feed and Train controls need. Everyone
+    // sees whether it is free for a Contest, working, or in one.
+    res.json({
+      creature,
+      ownedByYou,
+      controls: ownedByYou ? await care.controls(pool, wallet, id, req.now) : null,
+      contest: await contests.availability(pool, id, req.now),
+    });
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -330,7 +337,7 @@ app.post('/api/creatures/:id/gear/equip', async (req, res) => {
   if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
   const body = req.body || {};
   try {
-    const result = await gear.equip(pool, wallet, id, Number(body.gearId), String(body.slot || ''));
+    const result = await gear.equip(pool, wallet, id, Number(body.gearId), String(body.slot || ''), req.now);
     res.json({
       creature: await creatures.getById(pool, id, req.now),
       gear: await gear.inventory(pool, wallet),
@@ -347,7 +354,7 @@ app.post('/api/creatures/:id/gear/unequip', async (req, res) => {
   const id = creatureIdParam(req);
   if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
   try {
-    const result = await gear.unequip(pool, wallet, id, String((req.body && req.body.slot) || ''));
+    const result = await gear.unequip(pool, wallet, id, String((req.body && req.body.slot) || ''), req.now);
     res.json({
       creature: await creatures.getById(pool, id, req.now),
       gear: await gear.inventory(pool, wallet),
@@ -471,6 +478,85 @@ app.post('/api/stead/check-in', async (req, res) => {
   }
 });
 
+// Contests (lib/contests.js): one player challenges another, each with one
+// of their own Creatures. Every write is for the wallet the platform's
+// verified token links to this account, and answers with the whole Contests
+// overview again so the page shows one truth. Accept, decline and cancel
+// change a challenge once: a second one (another tab) is refused.
+const PLATFORM_API_BASE = process.env.USERNODE_PLATFORM_API_V1_URL || process.env.USERNODE_PLATFORM_API_URL;
+
+// "Is @handle a Homeroom player?", from the platform's user directory. In a
+// staging preview there is no app token: the user token alone is accepted.
+function directoryLookup(req) {
+  return async (handle) => {
+    if (!PLATFORM_API_BASE) return null;
+    const headers = { 'x-usernode-user-token': req.query.token || req.headers['x-usernode-token'] || '' };
+    if (process.env.USERNODE_LLM_PROXY_TOKEN) headers['x-usernode-app-token'] = process.env.USERNODE_LLM_PROXY_TOKEN;
+    const resp = await fetch(PLATFORM_API_BASE + '/users/lookup?username=' + encodeURIComponent(handle), { headers });
+    if (!resp.ok) return null;
+    return resp.json();
+  };
+}
+
+async function contestsAnswer(wallet, now, extra) {
+  return Object.assign(await contests.overview(pool, wallet, now), extra);
+}
+
+app.get('/api/contests', async (req, res) => {
+  try {
+    res.json(await contests.overview(pool, genesisWallet(req), req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/contests/challenges', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const body = req.body || {};
+  try {
+    const result = await contests.challenge(pool, wallet, req.user.username, {
+      creatureId: Number(body.creatureId),
+      opponent: body.opponent,
+    }, req.now, directoryLookup(req));
+    res.json(await contestsAnswer(wallet, req.now, result));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/contests/challenges/:id/:action', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const id = Number(req.params.id);
+  const action = req.params.action;
+  try {
+    let result;
+    if (action === 'accept') {
+      result = await contests.accept(pool, wallet, req.user.username, id, Number(req.body && req.body.creatureId), req.now);
+    } else if (action === 'decline') {
+      result = await contests.decline(pool, wallet, id, req.now);
+    } else if (action === 'cancel') {
+      result = await contests.cancel(pool, wallet, id, req.now);
+    } else {
+      return res.status(404).json({ error: 'not_found', message: 'Not found.' });
+    }
+    res.json(await contestsAnswer(wallet, req.now, result));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// A number nobody has is answered 200 with contest: null (not 404).
+app.get('/api/contests/:id', async (req, res) => {
+  try {
+    const contest = await contests.getContest(pool, Number(req.params.id), req.now);
+    res.json({ contest, walletId: genesisWallet(req), serverNow: req.now.toISOString() });
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated. Unauthenticated top-level
@@ -576,6 +662,34 @@ async function seedStaging() {
     }
   }
 }
+// Two more fake wallets, each with a Creature, and one Contest between them
+// made through the real challenge -> accept path ten minutes in the past, so
+// it is resolved (once) the first time anyone opens /contests/900001. Its
+// number is fixed like the demo Homestead's. Never the visitor's wallet.
+const STAGING_CONTEST_WALLETS = [
+  { wallet: 'ut1stagingdemochallenger', user: 'staging-demo-challenger', name: 'Staging demo A' },
+  { wallet: 'ut1stagingdemorival', user: 'staging-demo-rival', name: 'Staging demo B' },
+];
+const STAGING_DEMO_CONTEST_ID = 900001;
+async function seedStagingContest() {
+  const ids = [];
+  for (const p of STAGING_CONTEST_WALLETS) {
+    const minted = await genesis.mint(pool, p.wallet, p.user);
+    if (minted.seed && !minted.creature) {
+      const awakened = await genesis.awaken(pool, p.wallet, minted.seed.seedId);
+      if (awakened.created) await creatures.rename(pool, p.wallet, awakened.creature.creatureId, p.name);
+    }
+    const owned = await creatures.listOwned(pool, p.wallet);
+    if (!owned.length) return;
+    ids.push(owned[0].creatureId);
+  }
+  const exists = await pool.query('SELECT 1 FROM contests WHERE id = $1', [STAGING_DEMO_CONTEST_ID]);
+  if (exists.rows.length) return;
+  const at = new Date(Date.now() - 10 * 60 * 1000);
+  const [a, b] = STAGING_CONTEST_WALLETS;
+  const sent = await contests.challenge(pool, a.wallet, a.user, { creatureId: ids[0], opponent: b.wallet }, at);
+  await contests.accept(pool, b.wallet, b.user, sent.challenge.challengeId, ids[1], at, { contestId: STAGING_DEMO_CONTEST_ID });
+}
 async function awakenDemo(seedId) {
   const awakened = await genesis.awaken(pool, STAGING_DEMO_WALLET, seedId);
   if (awakened.created) {
@@ -593,7 +707,9 @@ async function start() {
   await work.ensureSchema(pool);
   await stead.ensureSchema(pool);
   await care.ensureSchema(pool);
+  await contests.ensureSchema(pool);
   if (IS_STAGING) await seedStaging().catch((err) => console.warn('[staging seed]', err.message));
+  if (IS_STAGING) await seedStagingContest().catch((err) => console.warn('[staging contest seed]', err.message));
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;
