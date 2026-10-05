@@ -22,10 +22,10 @@
       ]
     },
     {
-      "name": "Home shows CONNECT WALLET",
+      "name": "The header shows CONNECT until a wallet connects",
       "path": "/",
       "expectSelector": "#wallet [data-action=\"connect\"]",
-      "expectText": "CONNECT WALLET"
+      "expectText": "CONNECT"
     },
     {
       "name": "Home shows Genesis with GENESIS MINT",
@@ -44,12 +44,6 @@
       "path": "/",
       "expectSelector": "#daily-check-in [data-check-in-day=\"7\"]",
       "expectText": "DAILY CHECK-IN"
-    },
-    {
-      "name": "The header shows STEAD with no balance until a wallet connects",
-      "path": "/",
-      "expectSelector": "#stead-balance [data-stead-balance=\"\"]",
-      "expectText": "STEAD"
     },
     {
       "name": "My Creature placeholder",

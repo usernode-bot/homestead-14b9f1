@@ -28,7 +28,8 @@
     return '<svg class="' + (cls || 'h-5 w-5') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
   }
 
-  // The screens in the nav, in navigation order.
+  // The screens, in navigation order. PROFILE is reached from the header's
+  // player button instead of a tab (header: true).
   var ROUTES = [
     { path: '/', key: 'home', label: 'HOME' },
     { path: '/creature', key: 'creature', label: 'MY CREATURE' },
@@ -36,7 +37,7 @@
     { path: '/contests', key: 'contests', label: 'CONTESTS' },
     { path: '/marketplace', key: 'marketplace', label: 'MARKETPLACE' },
     { path: '/collection', key: 'collection', label: 'COLLECTION' },
-    { path: '/profile', key: 'profile', label: 'PROFILE' },
+    { path: '/profile', key: 'profile', label: 'PROFILE', header: true },
   ];
 
   function pageHeading(route) {
@@ -613,14 +614,14 @@
         '<section class="collectible state-empty py-14" data-empty="profile">' +
           '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon('profile', 'h-8 w-8') + '</span>' +
           '<p class="text-heading">Connect your wallet to view your profile.</p>' +
-          '<p class="max-w-sm text-body text-muted">Use CONNECT WALLET at the top of the screen. It uses the wallet linked to your Homeroom account.</p>' +
+          '<p class="max-w-sm text-body text-muted">Use CONNECT at the top of the screen. It uses the wallet linked to your Homeroom account.</p>' +
         '</section>';
     }
     return pageHeading(route) +
       '<section class="max-w-xl">' +
         '<ul class="list">' +
           '<li class="list-row justify-between"><span class="text-muted">Player</span><span class="font-bold" data-field="username"></span></li>' +
-          '<li class="list-row justify-between gap-4"><span class="text-muted">Wallet</span><span class="min-w-0 break-all text-right font-mono text-small" data-field="address"></span></li>' +
+          '<li class="list-row justify-between gap-4" data-profile-wallet><span class="text-muted">Wallet</span><span class="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1"><span class="flex shrink-0 items-center gap-1.5 text-small font-bold text-accent"><span class="h-2.5 w-2.5 rounded-full bg-accent" aria-hidden="true"></span>Connected</span><span class="min-w-0 break-all text-right font-mono text-small" data-field="address"></span></span></li>' +
           '<li class="list-row justify-between"><span class="text-muted">Creatures</span><span>' + profileCreatures(state) + '</span></li>' +
           '<li class="list-row justify-between"><span class="text-muted">STEAD Balance</span><span>' + profileStead(state) + '</span></li>' +
           '<li class="list-row justify-between"><span class="text-muted">Creature</span><span>' +
