@@ -58,13 +58,15 @@
         "public/js/app.js",
         "public/js/creature-art.js",
         "lib/homestead.js",
-        "styles/**"
+        "styles/**",
+        "public/js/work-config.js",
+        "lib/work.js"
       ]
     },
     {
-      "name": "A Homestead's six buildings start locked",
+      "name": "Buildings other than the Creature's Trade building stay locked",
       "path": "/homestead/1",
-      "expectSelector": "[data-buildings] [data-building=\"mystic-shrine\"][data-unlocked=\"false\"] [data-building-status=\"locked\"]",
+      "expectSelector": "[data-buildings] [data-unlocked=\"false\"] [data-building-status=\"locked\"]",
       "expectText": "Requires future Homestead progression."
     },
     {
@@ -72,6 +74,24 @@
       "path": "/homestead/1",
       "expectSelector": "[data-storage] [data-storage-used=\"0\"][data-storage-capacity=\"100\"]",
       "expectText": "0 / 100"
+    },
+    {
+      "name": "The Creature's Trade building is available",
+      "path": "/homestead/1",
+      "expectSelector": "[data-buildings] [data-unlocked=\"true\"] [data-building-status=\"available\"]",
+      "expectText": "works here."
+    },
+    {
+      "name": "A Homestead shows its Creature's Work",
+      "path": "/homestead/1",
+      "expectSelector": "[data-homestead] [data-work] [data-work-status] [data-work-id]",
+      "expectText": "Work history"
+    },
+    {
+      "name": "A Homestead shows its resources by group",
+      "path": "/homestead/1",
+      "expectSelector": "[data-resources] [data-resource-group=\"materials\"] [data-resource=\"crystal\"]",
+      "expectText": "Materials"
     },
     {
       "name": "An unknown Homestead number shows not found",

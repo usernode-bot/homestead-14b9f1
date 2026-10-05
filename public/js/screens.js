@@ -292,14 +292,19 @@
           '<a href="/" data-nav class="btn-secondary mt-2">Go to Genesis</a>' +
         '</section>';
     }
-    return pageHeading(route) + homesteadView.page(h.homestead, h.creature);
+    return pageHeading(route) + homesteadView.page(h.homestead, h.creature, {
+      work: h.work, canAct: true, pending: h.pending, error: h.error, scope: 'own', clockOffset: h.clockOffset,
+    });
   }
 
   // A Homestead by its number, /homestead/<id>: anyone can look.
   function homesteadById(state, route) {
     var v = state.viewedHomestead;
     var heading = pageHeading(route.nav || route);
-    if (v.status === 'ready' && v.homestead) return heading + homesteadView.page(v.homestead, v.creature);
+    // Read-only here, even for its owner: Work is sent from HOMESTEAD.
+    if (v.status === 'ready' && v.homestead) {
+      return heading + homesteadView.page(v.homestead, v.creature, { work: v.work, canAct: false, scope: 'viewed', clockOffset: v.clockOffset });
+    }
     if (v.status === 'missing') {
       return heading +
         '<section class="collectible state-empty max-w-3xl py-14" data-empty="homestead-missing">' +
