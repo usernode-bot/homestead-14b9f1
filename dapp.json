@@ -1,0 +1,10 @@
+{
+  "description": "Collectible game where you raise, train, and battle cute little monsters in your homestead",
+  "secrets": [],
+  "governance": {
+    "approvers": "invited",
+    "approvals": {
+      "atLeast": 1
+    }
+  }
+}
