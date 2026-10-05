@@ -51,7 +51,19 @@
       viewedHomestead: { status: 'idle', id: null, homestead: null, creature: null, work: null, clockOffset: 0, ownedByYou: false }, // status adds 'missing'
       // Resources live in the Homestead's storage (homestead.storage), not here.
       resources: {},
-      homePoints: 0, // HOME Points
+      // This wallet's STEAD Points, its ledger (newest first) and Daily
+      // Check-in (stead.js, lib/stead.js shape). The server owns every
+      // number; the page only shows what it answered.
+      stead: {
+        status: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
+        walletId: null,
+        steadBalance: null, // null while no wallet is connected
+        checkIn: null,
+        ledger: [],
+        pending: null, // 'claim' while a claim is in flight
+        notice: null, // 'claimed' after a claim succeeds
+        error: null, // what the last claim could not do
+      },
       gear: [],
       contests: null, // head-to-head play (see CLAUDE.md content rules)
       marketplace: { listings: [] },

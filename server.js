@@ -6,6 +6,7 @@ const genesis = require('./lib/genesis');
 const creatures = require('./lib/creatures');
 const homestead = require('./lib/homestead');
 const work = require('./lib/work');
+const stead = require('./lib/stead');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -185,7 +186,7 @@ function genesisWallet(req) {
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -352,6 +353,30 @@ app.post('/api/work/collect-pending', async (req, res) => {
   }
 });
 
+// STEAD Points and Daily Check-in (lib/stead.js). Always for the wallet the
+// platform's verified token links to this account, never one the browser
+// names, and every calendar day comes from the server's clock (req.now) in
+// the game timezone. No wallet: no balance, and no anonymous account.
+app.get('/api/stead', async (req, res) => {
+  try {
+    res.json(await stead.getState(pool, genesisWallet(req), req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// One claim per wallet per calendar day: a second one (double click, another
+// tab, a retry) is refused with already_claimed and pays nothing.
+app.post('/api/stead/check-in', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  try {
+    res.json(await stead.claimCheckIn(pool, wallet, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated. Unauthenticated top-level
@@ -419,10 +444,23 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // obviously fake Creature to look at, made through the real Genesis -> Awaken
 // path for a fake wallet (never the visitor's). Idempotent: a reboot finds the
 // Genesis already used and changes nothing.
-const STAGING_DEMO_WALLET = 'ut1stagingdemowallet';
+// The demo Homestead always has the number STAGING_DEMO_HOMESTEAD_ID, so the
+// dapp.json checks can open /homestead/900001 whatever real Homesteads the
+// copied production database already holds (they took the low numbers, so
+// /homestead/1 is a real player's). The wallet is new for that reason too: a
+// staging database that already gave the earlier demo wallet
+// (ut1stagingdemowallet) a low number keeps it, since numbers never change.
+const STAGING_DEMO_WALLET = 'ut1stagingdemohomestead';
+const STAGING_DEMO_HOMESTEAD_ID = 900001;
 async function seedStaging() {
   const minted = await genesis.mint(pool, STAGING_DEMO_WALLET, 'staging-demo-user');
   if (minted.seed && !minted.creature) await awakenDemo(minted.seed.seedId);
+  // Reserve the demo Homestead's number (the sequence never reaches it), then
+  // let the real open path fill in its buildings and move the Creature in.
+  await pool.query(
+    'INSERT INTO homesteads (id, owner, storage) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+    [STAGING_DEMO_HOMESTEAD_ID, STAGING_DEMO_WALLET, JSON.stringify(require('./public/js/homestead-config').emptyStorage())]
+  );
   // The demo Creature's Homestead, made the same way an owner opening it does.
   const opened = await homestead.open(pool, STAGING_DEMO_WALLET);
   // Send the demo Creature to work once, through the real path, an hour ago
@@ -451,6 +489,7 @@ async function start() {
   if (filled) console.log(`[creatures] filled in ${filled} earlier Creature(s)`);
   await homestead.ensureSchema(pool);
   await work.ensureSchema(pool);
+  await stead.ensureSchema(pool);
   if (IS_STAGING) await seedStaging().catch((err) => console.warn('[staging seed]', err.message));
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.

@@ -6,7 +6,7 @@
 // Creature -> Trade -> Work -> Building -> Resources. A Creature only works at
 // the building of its own Trade, for one of the DURATIONS, and brings home the
 // resources its Trade produces. Rewards are rolled once, on the server, when
-// the Work is complete (lib/work.js). Work never produces HOME Points and
+// the Work is complete (lib/work.js). Work never produces STEAD Points and
 // never changes the Creature.
 (function (root) {
   // How long a Creature can be sent to work. id is what the server stores.

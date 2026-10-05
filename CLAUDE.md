@@ -81,8 +81,9 @@ farming simulator, medieval fantasy or a crypto dashboard.
 PR #1 built the foundation: navigation, the wallet area, the Home screen and
 placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). PR #3 made
 the Creature a full collectible (below). PR #4 added the Homestead; PR #5 Work
-& Resources (below). Listings, breeding, training, HOME Points and
-transactions do not exist yet, and none may be faked.
+& Resources (below); PR #6 STEAD Points and Daily Check-in (below). Listings,
+breeding, training, spending STEAD and transactions do not exist yet, and none
+may be faked.
 
 - **Genesis:** `lib/genesis.js` holds every rule, enforced in Postgres
   transactions: one Genesis per wallet (`genesis_wallets.genesis_used`, which
@@ -112,14 +113,26 @@ transactions do not exist yet, and none may be faked.
   `collected` never above the reward (trigger), overflow kept pending on the
   record. Balance (durations, Trade -> building, per-hour ranges, resource
   groups, history size) is only in `public/js/work-config.js`. Work never
-  produces HOME Points and never changes the Creature.
+  produces STEAD and never changes the Creature.
+- **STEAD Points** ("STEAD" in the UI) are the one internal gameplay currency:
+  not a token, not crypto, not money, nothing on-chain. Never call it HOME,
+  coins, gold or tokens. `lib/stead.js` owns it: one `stead_accounts` row per
+  wallet (balance, never below 0; streak), an append-only `stead_ledger`
+  (income positive, expenses negative), and `creditStead` / `debitStead` /
+  `getSteadBalance` / `getSteadLedger` as the only way to touch a balance. A
+  ledger entry may carry a key unique per (owner, type). Daily Check-in uses
+  the date in `GAME_TIMEZONE`, so a wallet checks in once per calendar day,
+  always worked out on the server from `req.now`. Rewards, timezone and every
+  ledger type (spending types are reserved, inactive) are only in
+  `public/js/stead-config.js`. The two economies stay separate: Work ->
+  Resources, Daily Check-in -> STEAD.
 - **Supply cap:** there can never be more than 5,000 Creatures.
   `MAX_CREATURE_SUPPLY` in `public/js/config.js` is the only place that number
   is written. The page reads it as `window.HOMESTEAD_CONFIG`, the server as
   `require('./public/js/config')`. Every Creature creation system must check it.
 - **Game state:** `public/js/state.js` is the one store (`HOMESTEAD_STORE`),
   with a slot per future system (wallet, supply, creature, seed, homestead,
-  resources, homePoints, gear, contests, marketplace, breeding). A new system
+  resources, stead, gear, contests, marketplace, breeding). A new system
   fills its slot; screens read the store and re-render on `subscribe`.
 - **Wallet:** CONNECT WALLET reads the wallet linked to the signed-in Homeroom
   account from `GET /api/me` (`req.user.usernode_pubkey`, verified by the
