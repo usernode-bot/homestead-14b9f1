@@ -45,10 +45,161 @@
       '</section>';
   }
 
+  function fmtDate(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function isSoldOut(state) {
+    return state.supply.status === 'ready' && state.supply.created >= config.MAX_CREATURE_SUPPLY;
+  }
+
+  // The dormant Seed: a stitched-up pod with a lime mohawk of sprouts and a
+  // crack glowing from inside. Nothing about the Creature shows through.
+  var SEED_ART =
+    '<svg class="h-40 w-32 shrink-0" viewBox="0 0 120 150" aria-hidden="true">' +
+      '<path d="M40 40l6-22 7 15 7-25 7 25 7-15 6 22z" class="fill-accent"/>' +
+      '<path d="M60 34c28 0 46 34 46 62 0 30-20 48-46 48S14 126 14 96c0-28 18-62 46-62z" class="fill-raised stroke-line" stroke-width="3"/>' +
+      '<path d="M60 38c-9 26 9 56 0 102" fill="none" class="stroke-punk" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 7"/>' +
+      '<path d="M53 58l13 4M51 82l14 3M52 106l14 3" fill="none" class="stroke-punk" stroke-width="3" stroke-linecap="round"/>' +
+      '<path d="M80 74l7 7-5 5 7 8" fill="none" class="stroke-accent" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="34" cy="104" r="5" class="fill-ground stroke-punk" stroke-width="3"/>' +
+    '</svg>';
+
+  // Genesis on Home: exactly one of mint, sold out, the Seed or the Creature.
+  function genesisPanel(state) {
+    var max = config.MAX_CREATURE_SUPPLY;
+    var w = state.wallet;
+    var g = state.genesis;
+    var connected = w.status === 'connected';
+    var soldOut = isSoldOut(state);
+    var errorLine = g.error ? '<p role="alert" class="mt-3 text-small text-danger" data-field="genesis-error"></p>' : '';
+    var soldOutBlock =
+      '<div class="mt-4" data-genesis-sold-out>' +
+        '<p class="text-heading font-black text-punk">GENESIS SOLD OUT</p>' +
+        '<p class="text-body text-muted">All ' + fmt(max) + ' Creatures have been awakened.</p>' +
+      '</div>';
+
+    if (connected && (g.status === 'idle' || g.status === 'loading')) {
+      return '<section class="collectible" id="genesis" aria-busy="true">' +
+        '<span class="sr-only">Loading your Genesis</span>' +
+        '<div class="skeleton h-7 w-40"></div>' +
+        '<div class="skeleton mt-3 h-5 w-64 max-w-full"></div>' +
+        '<div class="skeleton mt-5 h-11 w-44"></div>' +
+      '</section>';
+    }
+    if (connected && g.status === 'error') {
+      return '<section class="collectible state-error" id="genesis">' +
+        '<p class="text-heading">Couldn\'t load your Genesis.</p>' +
+        '<p class="max-w-sm text-body text-muted">Nothing has changed. Check your connection and try again.</p>' +
+        '<button type="button" class="btn-secondary mt-2" data-action="genesis-retry">Retry</button>' +
+      '</section>';
+    }
+
+    if (connected && g.genesisUsed) {
+      var c = state.creature;
+      var seed = state.seed;
+      if (c && c.owner === g.walletId) {
+        return '<section class="collectible" id="genesis" data-genesis="creature">' +
+          '<span class="sticker absolute -top-3 left-4">GENESIS</span>' +
+          '<div class="flex flex-col items-center gap-6 pt-2 sm:flex-row">' +
+            '<span class="flex h-32 w-32 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-line text-punk">' + icon('creature', 'h-16 w-16') + '</span>' +
+            '<div class="text-center sm:text-left">' +
+              '<h2 class="text-small font-bold text-muted">YOUR CREATURE</h2>' +
+              '<p class="text-title font-black tracking-tight" data-creature-id="' + c.creatureId + '">CREATURE #' + c.creatureId + '</p>' +
+              (g.notice === 'creature-awakened' ? '<p class="mt-1 text-body font-bold text-accent" role="status">Your Seed awakened.</p>' : '') +
+              '<p class="mt-2 text-body text-muted">Awakened from Seed #' + c.seedId + ' on ' + fmtDate(c.createdAt) + '. Who it is will be revealed in a future update.</p>' +
+              '<a href="/creature" data-nav class="btn-secondary mt-4">View My Creature</a>' +
+            '</div>' +
+          '</div>' +
+        '</section>';
+      }
+      if (!c && seed && seed.owner === g.walletId && seed.creatureId == null) {
+        var busy = g.pending === 'awaken';
+        return '<section class="collectible" id="genesis" data-genesis="seed">' +
+          '<span class="sticker absolute -top-3 left-4">GENESIS</span>' +
+          '<div class="flex flex-col items-center gap-6 pt-2 sm:flex-row">' +
+            SEED_ART +
+            '<div class="text-center sm:text-left">' +
+              '<h2 class="text-title font-black tracking-tight">YOUR SEED</h2>' +
+              '<p class="mt-1 inline-block rounded-full bg-raised px-3 py-1 text-small font-black tracking-wide text-punk" data-seed-status>' + seed.status + '</p>' +
+              (g.notice === 'seed-created' ? '<p class="mt-2 text-body font-bold text-accent" role="status">Genesis created. Seed #' + seed.seedId + ' is yours.</p>' : '') +
+              '<p class="mt-2 text-body text-muted">Something is waiting inside.</p>' +
+              (soldOut ? soldOutBlock : '') +
+              '<button type="button" class="btn-primary mt-4" data-action="awaken"' + (busy || soldOut ? ' disabled' : '') + '>' +
+                (busy ? 'AWAKENING…' : 'AWAKEN') +
+              '</button>' +
+              errorLine +
+            '</div>' +
+          '</div>' +
+        '</section>';
+      }
+      // Used, but this wallet no longer holds what it made (a later transfer).
+      return '<section class="collectible" id="genesis" data-genesis="used">' +
+        '<h2 class="text-title font-black tracking-tight">GENESIS USED</h2>' +
+        '<p class="mt-1 text-body text-muted">This wallet has already used its one Genesis.</p>' +
+      '</section>';
+    }
+
+    // Mint: available, or disabled with the reason shown.
+    var mintBusy = g.pending === 'mint';
+    var disabled = !connected || soldOut || mintBusy || state.supply.status !== 'ready';
+    var reason = '';
+    if (!connected) {
+      reason = '<p class="mt-3 text-small text-muted">Connect your wallet to use Genesis.</p>' +
+        (w.status === 'connecting' ? '' : '<button type="button" class="btn-secondary mt-3" data-action="connect">CONNECT WALLET</button>');
+    } else if (!soldOut) {
+      reason = '<p class="mt-3 text-small text-muted">Each wallet gets one Genesis, ever. It creates a Seed you can awaken into a Creature.</p>';
+    }
+    return '<section class="collectible" id="genesis" data-genesis="' + (soldOut ? 'sold-out' : 'mint') + '">' +
+      (soldOut
+        ? '<h2 class="text-title font-black tracking-tight">GENESIS SOLD OUT</h2>' +
+          '<p class="mt-1 text-body text-muted">All ' + fmt(max) + ' Creatures have been awakened.</p>' +
+          '<p class="mt-1 text-heading font-black tabular-nums text-punk">' + fmt(state.supply.created) + ' / ' + fmt(max) + '</p>'
+        : '<h2 class="text-title font-black tracking-tight">GENESIS</h2>' +
+          '<p class="mt-1 text-body text-muted">Create your first Seed.</p>') +
+      '<button type="button" class="btn-primary mt-4" data-action="genesis-mint"' + (disabled ? ' disabled' : '') + '>' +
+        (mintBusy ? 'CREATING SEED…' : 'GENESIS MINT') +
+      '</button>' +
+      reason +
+      errorLine +
+    '</section>';
+  }
+
+  function supplyCard(state) {
+    var max = config.MAX_CREATURE_SUPPLY;
+    var s = state.supply;
+    var body;
+    if (s.status === 'loading') {
+      body = '<div class="mt-4 flex justify-center" aria-busy="true"><span class="sr-only">Loading supply</span><div class="skeleton h-12 w-56"></div></div>' +
+        '<div class="skeleton mt-4 h-2"></div>' +
+        '<div class="skeleton mx-auto mt-3 h-5 w-40"></div>';
+    } else if (s.status === 'error') {
+      body = '<div class="state-error pb-0">' +
+        '<p class="text-body">Couldn\'t load the Creature supply.</p>' +
+        '<button type="button" class="btn-secondary" data-action="genesis-retry">Retry</button>' +
+      '</div>';
+    } else {
+      var created = s.created;
+      var pct = Math.min(100, (created / max) * 100);
+      body = '<p class="mt-4 text-display tabular-nums" id="supply-count" data-created="' + created + '">' + fmt(created) + ' / ' + fmt(max) + '</p>' +
+        '<div class="mt-4 h-2 overflow-hidden rounded-full bg-raised" role="progressbar" aria-label="Creatures awakened" aria-valuemin="0" aria-valuemax="' + max + '" aria-valuenow="' + created + '">' +
+          '<div class="h-full rounded-full bg-accent" style="width:' + pct + '%"></div>' +
+        '</div>' +
+        '<p class="mt-3 text-small text-muted">' +
+          (created >= max ? 'GENESIS SOLD OUT. Every Creature has been awakened.'
+            : created === 0 ? 'No Creatures have been awakened yet.'
+            : 'Creatures awakened') +
+        '</p>';
+    }
+    return '<div class="collectible text-center" id="supply">' +
+      '<span class="sticker absolute -top-3 left-4">' + fmt(max) + ' CREATURES EVER</span>' +
+      body +
+    '</div>';
+  }
+
   function home(state) {
     var max = config.MAX_CREATURE_SUPPLY;
-    var created = state.supply.created;
-    var pct = Math.min(100, (created / max) * 100);
     return '' +
       '<section class="grid items-center gap-8 py-4 md:grid-cols-5 md:py-10">' +
         '<div class="md:col-span-3">' +
@@ -60,31 +211,41 @@
           '</p>' +
         '</div>' +
         // The supply card: the one number that matters in this game.
-        '<div class="md:col-span-2">' +
-          '<div class="collectible text-center" id="supply">' +
-            '<span class="sticker absolute -top-3 left-4">' + fmt(max) + ' CREATURES EVER</span>' +
-            '<p class="mt-4 text-display tabular-nums" id="supply-count">' + fmt(created) + ' / ' + fmt(max) + '</p>' +
-            '<div class="mt-4 h-2 overflow-hidden rounded-full bg-raised" role="progressbar" aria-label="Creatures created" aria-valuemin="0" aria-valuemax="' + max + '" aria-valuenow="' + created + '">' +
-              '<div class="h-full rounded-full bg-accent" style="width:' + pct + '%"></div>' +
-            '</div>' +
-            '<p class="mt-3 text-small text-muted">No Creatures have been created yet.</p>' +
-          '</div>' +
-        '</div>' +
+        '<div class="md:col-span-2">' + supplyCard(state) + '</div>' +
       '</section>' +
-      '<section class="mt-6 max-w-2xl">' +
+      '<div class="mt-4 max-w-2xl">' + genesisPanel(state) + '</div>' +
+      '<section class="mt-10 max-w-2xl">' +
         '<h2 class="section-label">About the game</h2>' +
         '<ul class="list">' +
           '<li class="list-row items-start">' + icon('creature', 'mt-0.5 h-5 w-5 shrink-0 text-punk') + '<p class="text-body">HOMESTEAD is a collectible game about cute, strange punk monsters.</p></li>' +
           '<li class="list-row items-start">' + icon('collection', 'mt-0.5 h-5 w-5 shrink-0 text-punk') + '<p class="text-body">There will only ever be ' + fmt(max) + ' Creatures.</p></li>' +
-          '<li class="list-row items-start">' + icon('profile', 'mt-0.5 h-5 w-5 shrink-0 text-punk') + '<p class="text-body">Each wallet will eventually have ' + (config.GENESIS_PER_WALLET === 1 ? 'one' : fmt(config.GENESIS_PER_WALLET)) + ' Genesis opportunity.</p></li>' +
+          '<li class="list-row items-start">' + icon('profile', 'mt-0.5 h-5 w-5 shrink-0 text-punk') + '<p class="text-body">Each wallet gets ' + (config.GENESIS_PER_WALLET === 1 ? 'one' : fmt(config.GENESIS_PER_WALLET)) + ' Genesis, ever: a Seed to awaken into a Creature.</p></li>' +
           '<li class="list-row items-start">' + icon('homestead', 'mt-0.5 h-5 w-5 shrink-0 text-punk') + '<p class="text-body">Your Creature will eventually be able to live, work, train, compete, and trade.</p></li>' +
         '</ul>' +
-        '<p class="mt-3 px-1 text-small text-muted">None of these systems are live yet. They arrive in future updates.</p>' +
+        '<p class="mt-3 px-1 text-small text-muted">Genesis is live. Everything else arrives in future updates.</p>' +
       '</section>';
   }
 
   function creature(state, route) {
-    return placeholder(route, 'No Creature yet.', "Creatures can't be awakened yet. When Genesis opens, yours will live here.");
+    var c = state.creature;
+    if (state.wallet.status === 'connected' && c && c.owner === state.genesis.walletId) {
+      return pageHeading(route) +
+        '<section class="collectible max-w-xl" data-creature-id="' + c.creatureId + '">' +
+          (c.genesis ? '<span class="sticker absolute -top-3 left-4">GENESIS</span>' : '') +
+          '<div class="flex flex-col items-center gap-6 pt-2 sm:flex-row">' +
+            '<span class="flex h-32 w-32 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-line text-punk">' + icon('creature', 'h-16 w-16') + '</span>' +
+            '<div class="text-center sm:text-left">' +
+              '<p class="text-title font-black tracking-tight">CREATURE #' + c.creatureId + '</p>' +
+              '<p class="mt-2 text-body text-muted">Awakened from Seed #' + c.seedId + ' on ' + fmtDate(c.createdAt) + '.</p>' +
+              '<p class="mt-1 text-body text-muted">Who it is will be revealed in a future update.</p>' +
+            '</div>' +
+          '</div>' +
+        '</section>';
+    }
+    var hasSeed = state.wallet.status === 'connected' && state.seed && !c;
+    return placeholder(route, 'No Creature yet.', hasSeed
+      ? 'Your Seed is still dormant. Awaken it on Home.'
+      : 'Use Genesis on Home to create a Seed, then awaken it into your Creature.');
   }
   function homestead(state, route) {
     return placeholder(route, 'Your Homestead is waiting for its Creature.', 'Once you have a Creature, this is where it will make its home.');
@@ -94,6 +255,13 @@
   }
   function collection(state, route) {
     return placeholder(route, 'Your collection is empty.', 'Creatures you own will be collected here.');
+  }
+
+  function profileGenesis(state) {
+    var g = state.genesis;
+    if (g.status === 'error') return "Couldn't load";
+    if (g.status !== 'ready') return 'Loading…';
+    return g.genesisUsed ? 'Used' : 'Available';
   }
 
   function profile(state, route) {
@@ -111,7 +279,10 @@
         '<ul class="list">' +
           '<li class="list-row justify-between"><span class="text-muted">Player</span><span class="font-bold" data-field="username"></span></li>' +
           '<li class="list-row justify-between gap-4"><span class="text-muted">Wallet</span><span class="min-w-0 break-all text-right font-mono text-small" data-field="address"></span></li>' +
-          '<li class="list-row justify-between"><span class="text-muted">Creature</span><span>No Creature yet.</span></li>' +
+          '<li class="list-row justify-between"><span class="text-muted">Genesis</span><span>' + profileGenesis(state) + '</span></li>' +
+          '<li class="list-row justify-between"><span class="text-muted">Creature</span><span>' +
+            (state.creature && state.creature.owner === state.genesis.walletId ? 'CREATURE #' + state.creature.creatureId : 'No Creature yet.') +
+          '</span></li>' +
         '</ul>' +
         '<button type="button" class="btn-secondary mt-4" data-action="disconnect">Disconnect wallet</button>' +
       '</section>';

@@ -78,9 +78,20 @@ A collectible game about cute, strange punk monsters. The Creature is the
 collectible; the Homestead is the Creature's home. It must never look like a
 farming simulator, medieval fantasy or a crypto dashboard.
 
-PR #1 built only the foundation: navigation, the wallet area, the Home screen
-and placeholder screens. No Creatures, Genesis, listings, breeding or
-transactions exist yet, and none may be faked.
+PR #1 built the foundation: navigation, the wallet area, the Home screen and
+placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). Species,
+stats, listings, breeding and transactions do not exist yet, and none may be
+faked.
+
+- **Genesis:** `lib/genesis.js` holds every rule, enforced in Postgres
+  transactions: one Genesis per wallet (`genesis_wallets.genesis_used`, which
+  a trigger never lets go back to false), one dormant Seed per Genesis, one
+  Creature per Seed, and the single `creature_supply` counter whose new value
+  is the Creature's id (so ids are never reused and never pass the cap).
+  Nothing is on-chain: say "Genesis created", never "transaction confirmed".
+  A future transfer changes only `creatures.owner` / `seeds.owner`;
+  `created_by` and `genesis_wallet` keep the history. `npm test` runs its
+  tests against `DATABASE_URL` (a throwaway database: it drops the tables).
 
 - **Supply cap:** there can never be more than 5,000 Creatures.
   `MAX_CREATURE_SUPPLY` in `public/js/config.js` is the only place that number
@@ -131,5 +142,5 @@ The kit is in `styles/tailwind-input.css`: colour tokens (named in
 
 ## App-specific conventions
 
-- No game tables exist yet. Add each with `CREATE TABLE IF NOT EXISTS` in
-  `start()` in `server.js`.
+- Add each game table with `CREATE TABLE IF NOT EXISTS`, called from
+  `start()` in `server.js` (Genesis does this in `genesis.ensureSchema`).

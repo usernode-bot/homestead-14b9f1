@@ -3,7 +3,7 @@
 // "Connecting" reads the wallet linked to the signed-in Homeroom account,
 // as the server verified it from the platform's identity token
 // (GET /api/me -> req.user.usernode_pubkey). Nothing is signed or sent: this
-// is only the identity the future Genesis system will build on.
+// is only the identity Genesis (genesis.js) builds on.
 // Disconnecting forgets the connection on this device.
 (function () {
   var store = window.HOMESTEAD_STORE;
@@ -13,14 +13,21 @@
   var token = params.get('token') || '';
   var REMEMBER_KEY = 'homestead:wallet-connected';
 
-  function api(path) {
+  // GET by default; pass { method: 'POST', body: {...} } to write.
+  function api(path, opts) {
+    opts = opts || {};
     var headers = {};
     if (token) headers['x-usernode-token'] = token;
     var u = window.usernode;
     if (u && u.previewNow && typeof u.now === 'function') {
       headers['x-usernode-now'] = u.now().toISOString();
     }
-    return fetch(path, { headers: headers });
+    var init = { method: opts.method || 'GET', headers: headers };
+    if (opts.body !== undefined) {
+      headers['content-type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
+    }
+    return fetch(path, init);
   }
 
   function shortAddress(address) {
@@ -86,5 +93,6 @@
     restore: restore,
     shortAddress: shortAddress,
     token: token,
+    api: api,
   };
 })();

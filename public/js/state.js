@@ -13,11 +13,22 @@
         username: null,
         error: null, // why the last connect attempt did not connect
       },
-      // Global Creature supply. `created` stays 0 until Genesis exists; the
-      // cap always comes from HOMESTEAD_CONFIG.MAX_CREATURE_SUPPLY.
-      supply: { created: 0 },
-      creature: null, // this wallet's Creature
-      seed: null,
+      // Global Creature supply, read from the server (genesis.js). The cap
+      // always comes from HOMESTEAD_CONFIG.MAX_CREATURE_SUPPLY.
+      supply: { status: 'loading', created: 0 }, // status: 'loading' | 'ready' | 'error'
+      // This wallet's one Genesis (see genesis.js and lib/genesis.js).
+      genesis: {
+        status: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
+        walletId: null,
+        genesisUsed: false,
+        genesisSeedId: null,
+        genesisCreatureId: null,
+        pending: null, // 'mint' | 'awaken' while a request is in flight
+        notice: null, // 'seed-created' | 'creature-awakened' after one succeeds
+        error: null, // what the last mint or awaken could not do
+      },
+      creature: null, // this wallet's Genesis Creature
+      seed: null, // this wallet's Genesis Seed
       homestead: null, // the Creature's home
       resources: {},
       homePoints: 0, // HOME Points
@@ -37,7 +48,8 @@
     update: function (slot, patch) {
       if (!(slot in state)) throw new Error('Unknown game-state slot: ' + slot);
       var current = state[slot];
-      var next = current && typeof current === 'object' && !Array.isArray(current)
+      // A null patch clears the slot (seed, creature).
+      var next = patch && current && typeof current === 'object' && !Array.isArray(current)
         ? Object.assign({}, current, patch)
         : patch;
       state = Object.assign({}, state, { [slot]: next });

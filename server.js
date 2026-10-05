@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
+const genesis = require('./lib/genesis');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -173,6 +174,51 @@ app.get('/api/me', (req, res) => {
   });
 });
 
+// Genesis -> Seed -> Awaken (lib/genesis.js). The wallet is always the one
+// the platform's verified token links to this account, never one the browser
+// names. Reading works for guests (supply only); writes need a linked wallet.
+function genesisWallet(req) {
+  return req.user && req.user.usernode_pubkey ? req.user.usernode_pubkey : null;
+}
+
+function sendGenesisError(res, err) {
+  if (err instanceof genesis.GenesisError) {
+    return res.status(err.status).json({ error: err.code, message: err.message });
+  }
+  console.error('[genesis]', err);
+  return res.status(500).json({ error: 'server_error', message: 'Something went wrong. Try again.' });
+}
+
+app.get('/api/genesis', async (req, res) => {
+  try {
+    res.json(await genesis.getState(pool, genesisWallet(req)));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/genesis/mint', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  try {
+    res.json(await genesis.mint(pool, wallet, req.user.id));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/genesis/awaken', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const seedId = Number(req.body && req.body.seedId);
+  if (!Number.isInteger(seedId) || seedId < 1) return res.status(400).json({ error: 'bad_seed', message: 'Which Seed?' });
+  try {
+    res.json(await genesis.awaken(pool, wallet, seedId));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated. Unauthenticated top-level
@@ -237,8 +283,8 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 async function start() {
-  // No game tables yet: Creatures and the systems around them arrive in
-  // later PRs, each adding its own idempotent CREATE TABLE IF NOT EXISTS here.
+  // Each game system adds its own idempotent CREATE TABLE IF NOT EXISTS here.
+  await genesis.ensureSchema(pool);
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;
