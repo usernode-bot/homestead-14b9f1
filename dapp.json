@@ -1,6 +1,22 @@
 {
   "description": "Collectible game where you raise, train, and battle cute little monsters in your homestead",
   "secrets": [],
+  "tests": [
+    {
+      "name": "Seed screen shows for a new wallet",
+      "path": "/",
+      "expectText": "Awaken"
+    },
+    {
+      "id": "homestead.creature",
+      "name": "Creature card renders",
+      "path": "/?demo=1",
+      "expectSelector": "#creature-card",
+      "expectText": "Demo Mossling",
+      "visual": true,
+      "impact": ["public/index.html", "server.js"]
+    }
+  ],
   "governance": {
     "approvers": "invited",
     "approvals": {

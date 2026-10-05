@@ -154,29 +154,125 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // fresh load.
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 
-// Button press
-app.post('/api/press', async (req, res) => {
+// ── HOMESTEAD: the creature ──────────────────────────────────────────────
+// Tuning constants. Rebalance here; the schema does not change with them.
+const MAX_ENERGY = 100;
+const STARTING_STRENGTH = 5;
+const FEED_ENERGY = 20;
+const TRAIN_ENERGY_COST = 10;
+const TRAIN_STRENGTH_GAIN = 1;
+
+// Awaken picks both at random on the server; the user does not choose.
+const SPECIES = ['Mossling', 'Emberpuff', 'Pebblet', 'Dandelune', 'Bramblet', 'Puddlemew'];
+const NAMES = ['Pip', 'Momo', 'Biscuit', 'Clover', 'Noodle', 'Sprout', 'Button', 'Waffle', 'Tofu', 'Juniper', 'Maple', 'Bean'];
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+// The populated screen's staging demo data, served on ?demo=1 (staging
+// only) and computed here without touching the database, so no demo
+// creature is ever attributed to a real visitor.
+function demoCreature() {
+  return {
+    creature: {
+      species: 'Mossling',
+      name: 'Demo Mossling',
+      strength: 7,
+      energy: 65,
+      awakened_at: '2026-09-01T09:00:00.000Z',
+    },
+    careLog: [
+      { action: 'train', detail: 'Staging demo: Trained: Strength +1', created_at: '2026-09-01T12:00:00.000Z' },
+      { action: 'feed', detail: 'Staging demo: Fed: Energy +20', created_at: '2026-09-01T10:00:00.000Z' },
+      { action: 'feed', detail: 'Staging demo: Fed: Energy +20', created_at: '2026-09-01T09:30:00.000Z' },
+    ],
+  };
+}
+
+// Your creature, or null when this wallet has not awakened one yet. The
+// care log is the creature's permanent history, last 20 entries, newest
+// first.
+app.get('/api/creature', async (req, res) => {
+  if (IS_STAGING && req.query.demo === '1') return res.json(demoCreature());
   try {
-    await pool.query(`
-      INSERT INTO presses (user_id, username) VALUES ($1, $2)
-    `, [req.user.id, req.user.username]);
-    res.json({ ok: true });
+    const userId = req.user ? req.user.id : null;
+    const { rows } = await pool.query(`
+      SELECT id, species, name, strength, energy, awakened_at
+      FROM creatures WHERE user_id = $1
+    `, [userId]);
+    if (!rows.length) return res.json({ creature: null, careLog: [] });
+    const log = await pool.query(`
+      SELECT action, detail, created_at
+      FROM care_log WHERE creature_id = $1
+      ORDER BY id DESC LIMIT 20
+    `, [rows[0].id]);
+    res.json({ creature: rows[0], careLog: log.rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Leaderboard
-app.get('/api/leaderboard', async (_req, res) => {
+// Seed → Awaken: one Genesis Creature per wallet. A single INSERT guarded
+// by the user_id unique constraint, so a race double-tap gets the same 409.
+app.post('/api/awaken', async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT username, COUNT(*) as presses
-      FROM presses
-      GROUP BY username
-      ORDER BY presses DESC
-      LIMIT 50
-    `);
-    res.json({ leaderboard: rows });
+      INSERT INTO creatures (user_id, username, species, name, strength, energy, awakened_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (user_id) DO NOTHING
+      RETURNING species, name, strength, energy, awakened_at
+    `, [req.user.id, req.user.username, pick(SPECIES), pick(NAMES), STARTING_STRENGTH, MAX_ENERGY, req.now]);
+    if (!rows.length) return res.status(409).json({ error: 'already_awakened' });
+    res.json({ creature: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Feed restores energy, up to the cap. The conditional UPDATE is atomic: a
+// double-tap updates nothing, which is then told apart from "no creature"
+// and answered 400 energy_full so a no-op never reaches the care log.
+app.post('/api/feed', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      UPDATE creatures SET energy = LEAST($2, energy + $3)
+      WHERE user_id = $1 AND energy < $2
+      RETURNING id, species, name, strength, energy, awakened_at
+    `, [req.user.id, MAX_ENERGY, FEED_ENERGY]);
+    if (rows.length) {
+      await pool.query(`
+        INSERT INTO care_log (creature_id, username, action, detail, created_at)
+        VALUES ($1, $2, 'feed', $3, $4)
+      `, [rows[0].id, req.user.username, 'Fed: Energy +20', req.now]);
+      return res.json({ creature: rows[0] });
+    }
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM creatures WHERE user_id = $1', [req.user.id]);
+    if (!existing.length) return res.status(404).json({ error: 'no_creature' });
+    res.status(400).json({ error: 'energy_full' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Train spends energy for strength, with the same atomic guard as Feed.
+app.post('/api/train', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      UPDATE creatures
+      SET energy = energy - $2, strength = strength + $3
+      WHERE user_id = $1 AND energy >= $2
+      RETURNING id, species, name, strength, energy, awakened_at
+    `, [req.user.id, TRAIN_ENERGY_COST, TRAIN_STRENGTH_GAIN]);
+    if (rows.length) {
+      await pool.query(`
+        INSERT INTO care_log (creature_id, username, action, detail, created_at)
+        VALUES ($1, $2, 'train', $3, $4)
+      `, [rows[0].id, req.user.username, 'Trained: Strength +1', req.now]);
+      return res.json({ creature: rows[0] });
+    }
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM creatures WHERE user_id = $1', [req.user.id]);
+    if (!existing.length) return res.status(404).json({ error: 'no_creature' });
+    res.status(400).json({ error: 'not_enough_energy' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -220,12 +316,29 @@ app.get('*', (req, res) => {
 });
 
 async function start() {
+  // The starter demo's table, removed with the starter screen.
+  await pool.query('DROP TABLE IF EXISTS presses');
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS presses (
+    CREATE TABLE IF NOT EXISTS creatures (
       id SERIAL PRIMARY KEY,
-      user_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL UNIQUE,
       username VARCHAR(255) NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      species VARCHAR(64) NOT NULL,
+      name VARCHAR(64) NOT NULL,
+      strength INTEGER NOT NULL DEFAULT 5,
+      energy INTEGER NOT NULL DEFAULT 100,
+      awakened_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+  // Append-only: inserts only, no update or delete route.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS care_log (
+      id SERIAL PRIMARY KEY,
+      creature_id INTEGER NOT NULL REFERENCES creatures(id),
+      username VARCHAR(255) NOT NULL,
+      action VARCHAR(16) NOT NULL,
+      detail TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL
     )
   `);
   const server = app.listen(port, () => console.log(`Listening on :${port}`));

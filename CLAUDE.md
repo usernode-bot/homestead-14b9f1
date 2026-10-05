@@ -102,22 +102,26 @@ tables you've marked private), etc.
 
 Collectible game where you raise, train, and battle cute little monsters in your homestead
 
-_(add a sentence or two more of product context here so Claude Code has a
-shared understanding of what this app is for)_
+Each wallet raises **one Genesis Creature**, hatched through Seed →
+Awaken (the server picks the species and name at random; the user does
+not choose). The creature lives in your Homestead, where you care for it
+with Feed and Train, and its story accumulates in an append-only care
+log. Gear, sending the creature to work, battles, and a marketplace for
+buying and trading creatures with other players are later versions.
 
 ## Design
 
-This app's look. The first real version fills in the blanks; every later
+This app's look. The first real version filled it in; every later
 change follows it, and updates it when a request changes the look on purpose.
 
-- **Palette:** _(name the accent, any second colour and the neutrals, e.g.
-  "accent: tomato red; second: basil green; neutrals: warm greys")_
-- **Signature element:** _(the one thing on screen drawn from this app's
-  subject, which no other app would have)_
+- **Palette:** the starter kit's tokens, unchanged: teal accent, warm
+  grey neutrals. They already suit the cozy nature theme and pass
+  contrast in both looks.
+- **Signature element:** the creature portrait — one inline SVG monster
+  (round body, two eyes, a leaf sprout on its head), the same shape for
+  every species, tinted with the `bg-accent` token.
 - **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
   _(change their sizes in `tailwind.config.js` if you must, not their number)_
-- **One fixed look:** _(only for an app drawn as its own scene, such as a
-  game: which look, and why. Otherwise delete this line.)_
 
 The kit is in `styles/tailwind-input.css`: colour tokens with a light and
 a dark value (named in `tailwind.config.js`), and a few components
@@ -134,11 +138,16 @@ Re-theme by changing the token values there, keeping every text pair at
   Never show the empty state while loading or after a failure; an error says
   what failed, what still works, and offers Retry.
 - Seed obviously fake staging demo data so the populated screen can be seen
-  ("Staging mock data" in the platform conventions).
+  ("Staging mock data" in the platform conventions). HOMESTEAD serves its
+  populated-screen demo on request: `GET /api/creature?demo=1`, staging only.
 - No cards in cards, no uppercase eyebrows, no emoji as icons.
 
 ## App-specific conventions
 
-_(optional — e.g. "all currency values stored as integer cents, not
-floats"; "the `posts` table is append-only"; "avoid adding new
-dependencies"; etc.)_
+- Tuning constants (Feed +20 Energy capped at 100, Train −10 Energy /
+  +1 Strength, starting Strength 5, the species and name lists) live in
+  `server.js` and can be rebalanced without changing the schema.
+- The `care_log` table is append-only: inserts only, no update or
+  delete route.
+- One creature per wallet, enforced by a unique constraint on
+  `creatures.user_id`; there is no rename, release, or loss.
