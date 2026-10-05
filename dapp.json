@@ -6,5 +6,56 @@
     "approvals": {
       "atLeast": 1
     }
-  }
+  },
+  "tests": [
+    {
+      "id": "home.supply",
+      "name": "Home shows the tagline and 0 / 5,000 supply",
+      "path": "/",
+      "expectSelector": "#supply-count",
+      "expectText": "0 / 5,000",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "tailwind.config.js"
+      ]
+    },
+    {
+      "name": "Home shows CONNECT WALLET",
+      "path": "/",
+      "expectSelector": "#wallet [data-action=\"connect\"]",
+      "expectText": "CONNECT WALLET"
+    },
+    {
+      "name": "My Creature placeholder",
+      "path": "/creature",
+      "expectSelector": "[data-empty=\"creature\"]",
+      "expectText": "No Creature yet."
+    },
+    {
+      "name": "Homestead placeholder",
+      "path": "/homestead",
+      "expectSelector": "[data-empty=\"homestead\"]",
+      "expectText": "Your Homestead is waiting for its Creature."
+    },
+    {
+      "name": "Marketplace placeholder",
+      "path": "/marketplace",
+      "expectSelector": "[data-empty=\"marketplace\"]",
+      "expectText": "No Creatures listed yet."
+    },
+    {
+      "name": "Collection placeholder",
+      "path": "/collection",
+      "expectSelector": "[data-empty=\"collection\"]",
+      "expectText": "Your collection is empty."
+    },
+    {
+      "name": "Profile asks to connect a wallet",
+      "path": "/profile",
+      "expectSelector": "[data-empty=\"profile\"]",
+      "expectText": "Connect your wallet to view your profile."
+    }
+  ]
 }
