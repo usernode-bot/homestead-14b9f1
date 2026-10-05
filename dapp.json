@@ -58,6 +58,33 @@
       "expectText": "Your collection is empty."
     },
     {
+      "id": "creature.profile",
+      "name": "A Creature's profile shows its name, Gene, stats and Creature ID",
+      "path": "/creature/1",
+      "expectSelector": "[data-creature-profile] [data-gene]",
+      "expectText": "CR-00001",
+      "visual": true,
+      "impact": [
+        "public/js/creature-*.js",
+        "public/js/creatures.js",
+        "public/js/screens.js",
+        "lib/creature*.js",
+        "styles/**"
+      ]
+    },
+    {
+      "name": "A Creature's profile shows its base stats",
+      "path": "/creature/1",
+      "expectSelector": "[data-creature-profile] [data-stat=\"luck\"]",
+      "expectText": "Personality"
+    },
+    {
+      "name": "An unknown Creature ID shows not found",
+      "path": "/creature/999999",
+      "expectSelector": "[data-empty=\"creature-missing\"]",
+      "expectText": "No Creature has that ID."
+    },
+    {
       "name": "Profile asks to connect a wallet",
       "path": "/profile",
       "expectSelector": "[data-empty=\"profile\"]",

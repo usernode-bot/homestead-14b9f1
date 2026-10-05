@@ -3,6 +3,8 @@
 // afterwards as text in app.js, never written into this HTML.
 (function () {
   var config = window.HOMESTEAD_CONFIG;
+  var creatureConfig = window.HOMESTEAD_CREATURE_CONFIG;
+  var cards = window.HOMESTEAD_CREATURE_CARD;
 
   function fmt(n) { return Number(n).toLocaleString('en-US'); }
 
@@ -48,6 +50,15 @@
   function fmtDate(iso) {
     var d = new Date(iso);
     return isNaN(d) ? '' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function speciesLabel(c) {
+    var sp = creatureConfig.byId(creatureConfig.SPECIES, c.species);
+    return sp ? sp.label : 'Creature';
+  }
+
+  function ownsGenesisCreature(state) {
+    return state.wallet.status === 'connected' && state.creature && state.creature.owner === state.genesis.walletId;
   }
 
   function isSoldOut(state) {
@@ -103,12 +114,13 @@
         return '<section class="collectible" id="genesis" data-genesis="creature">' +
           '<span class="sticker absolute -top-3 left-4">GENESIS</span>' +
           '<div class="flex flex-col items-center gap-6 pt-2 sm:flex-row">' +
-            '<span class="flex h-32 w-32 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-line text-punk">' + icon('creature', 'h-16 w-16') + '</span>' +
-            '<div class="text-center sm:text-left">' +
+            cards.art(c, 'h-32 w-32') +
+            '<div class="min-w-0 text-center sm:text-left">' +
               '<h2 class="text-small font-bold text-muted">YOUR CREATURE</h2>' +
-              '<p class="text-title font-black tracking-tight" data-creature-id="' + c.creatureId + '">CREATURE #' + c.creatureId + '</p>' +
-              (g.notice === 'creature-awakened' ? '<p class="mt-1 text-body font-bold text-accent" role="status">Your Seed awakened.</p>' : '') +
-              '<p class="mt-2 text-body text-muted">Awakened from Seed #' + c.seedId + ' on ' + fmtDate(c.createdAt) + '. Who it is will be revealed in a future update.</p>' +
+              '<p class="break-words text-title font-black tracking-tight" data-creature-id="' + c.creatureId + '">' + cards.nameSpan(c) + '</p>' +
+              '<p class="mt-1 flex flex-wrap items-center justify-center gap-2 text-body sm:justify-start"><span class="font-bold">' + speciesLabel(c) + '</span>' + cards.rarityBadge(c) + '</p>' +
+              (g.notice === 'creature-awakened' ? '<p class="mt-2 text-body font-bold text-accent" role="status">Your Seed awakened.</p>' : '') +
+              '<p class="mt-2 text-body text-muted">' + cards.formatId(c.creatureId) + ', awakened from Seed #' + c.seedId + ' on ' + fmtDate(c.createdAt) + '.</p>' +
               '<a href="/creature" data-nav class="btn-secondary mt-4">View My Creature</a>' +
             '</div>' +
           '</div>' +
@@ -228,19 +240,8 @@
 
   function creature(state, route) {
     var c = state.creature;
-    if (state.wallet.status === 'connected' && c && c.owner === state.genesis.walletId) {
-      return pageHeading(route) +
-        '<section class="collectible max-w-xl" data-creature-id="' + c.creatureId + '">' +
-          (c.genesis ? '<span class="sticker absolute -top-3 left-4">GENESIS</span>' : '') +
-          '<div class="flex flex-col items-center gap-6 pt-2 sm:flex-row">' +
-            '<span class="flex h-32 w-32 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-line text-punk">' + icon('creature', 'h-16 w-16') + '</span>' +
-            '<div class="text-center sm:text-left">' +
-              '<p class="text-title font-black tracking-tight">CREATURE #' + c.creatureId + '</p>' +
-              '<p class="mt-2 text-body text-muted">Awakened from Seed #' + c.seedId + ' on ' + fmtDate(c.createdAt) + '.</p>' +
-              '<p class="mt-1 text-body text-muted">Who it is will be revealed in a future update.</p>' +
-            '</div>' +
-          '</div>' +
-        '</section>';
+    if (ownsGenesisCreature(state)) {
+      return pageHeading(route) + cards.profile(c, { canRename: true });
     }
     var hasSeed = state.wallet.status === 'connected' && state.seed && !c;
     return placeholder(route, 'No Creature yet.', hasSeed
@@ -253,8 +254,72 @@
   function marketplace(state, route) {
     return placeholder(route, 'No Creatures listed yet.', 'Trading opens in a future update.');
   }
+  // A Creature by its id, /creature/<id>: anyone can look; only its owner
+  // can rename it.
+  function creatureById(state, route) {
+    var v = state.viewedCreature;
+    var mine = v.status === 'ready' && v.ownedByYou && state.wallet.status === 'connected';
+    var heading = pageHeading(mine ? route : { key: 'creature', label: 'CREATURE' });
+    if (v.status === 'ready' && v.creature) return heading + cards.profile(v.creature, { canRename: mine });
+    if (v.status === 'missing') {
+      return heading +
+        '<section class="collectible state-empty py-14" data-empty="creature-missing">' +
+          '<p class="text-heading">No Creature has that ID.</p>' +
+          '<p class="max-w-sm text-body text-muted">It may not have awakened yet.</p>' +
+          '<a href="/collection" data-nav class="btn-secondary mt-2">Go to Collection</a>' +
+        '</section>';
+    }
+    if (v.status === 'error') {
+      return heading +
+        '<section class="collectible state-error">' +
+          '<p class="text-heading">Couldn\'t load this Creature.</p>' +
+          '<p class="max-w-sm text-body text-muted">Check your connection and try again.</p>' +
+          '<button type="button" class="btn-secondary mt-2" data-action="creature-retry">Retry</button>' +
+        '</section>';
+    }
+    return heading +
+      '<section class="collectible max-w-3xl" aria-busy="true"><span class="sr-only">Loading this Creature</span>' +
+        '<div class="flex flex-col items-center gap-6 sm:flex-row">' +
+          '<div class="skeleton h-48 w-48 rounded-2xl"></div>' +
+          '<div class="w-full max-w-xs"><div class="skeleton h-5 w-24"></div><div class="skeleton mt-3 h-9 w-48"></div><div class="skeleton mt-3 h-6 w-40"></div></div>' +
+        '</div>' +
+      '</section>';
+  }
+
   function collection(state, route) {
-    return placeholder(route, 'Your collection is empty.', 'Creatures you own will be collected here.');
+    if (state.wallet.status !== 'connected') {
+      return placeholder(route, 'Your collection is empty.', 'Connect your wallet to see the Creatures you own.');
+    }
+    var col = state.collection;
+    if (col.status === 'error') {
+      return pageHeading(route) +
+        '<section class="collectible state-error">' +
+          '<p class="text-heading">Couldn\'t load your collection.</p>' +
+          '<p class="max-w-sm text-body text-muted">Your Creatures are safe. Check your connection and try again.</p>' +
+          '<button type="button" class="btn-secondary mt-2" data-action="collection-retry">Retry</button>' +
+        '</section>';
+    }
+    if (col.status !== 'ready') {
+      return pageHeading(route) +
+        '<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" aria-busy="true"><span class="sr-only">Loading your collection</span>' +
+          '<div class="collectible"><div class="skeleton aspect-square w-full rounded-2xl"></div><div class="skeleton mt-3 h-6 w-24"></div><div class="skeleton mt-2 h-5 w-16"></div></div>' +
+          '<div class="collectible"><div class="skeleton aspect-square w-full rounded-2xl"></div><div class="skeleton mt-3 h-6 w-24"></div><div class="skeleton mt-2 h-5 w-16"></div></div>' +
+        '</div>';
+    }
+    if (!col.creatures.length) {
+      return pageHeading(route) +
+        '<section class="collectible state-empty py-14" data-empty="collection">' +
+          '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon('collection', 'h-8 w-8') + '</span>' +
+          '<p class="text-heading">Your collection is empty.</p>' +
+          '<p class="max-w-sm text-body text-muted">Use Genesis on Home to awaken your first Creature.</p>' +
+          '<a href="/" data-nav class="btn-secondary mt-2">Go to Genesis</a>' +
+        '</section>';
+    }
+    return pageHeading(route) +
+      '<p class="section-label">' + col.creatures.length + (col.creatures.length === 1 ? ' Creature' : ' Creatures') + '</p>' +
+      '<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" data-collection>' +
+        col.creatures.map(function (c) { return cards.card(c, { href: '/creature/' + Number(c.creatureId) }); }).join('') +
+      '</div>';
   }
 
   function profileGenesis(state) {
@@ -281,7 +346,9 @@
           '<li class="list-row justify-between gap-4"><span class="text-muted">Wallet</span><span class="min-w-0 break-all text-right font-mono text-small" data-field="address"></span></li>' +
           '<li class="list-row justify-between"><span class="text-muted">Genesis</span><span>' + profileGenesis(state) + '</span></li>' +
           '<li class="list-row justify-between"><span class="text-muted">Creature</span><span>' +
-            (state.creature && state.creature.owner === state.genesis.walletId ? 'CREATURE #' + state.creature.creatureId : 'No Creature yet.') +
+            (ownsGenesisCreature(state)
+              ? '<a href="/creature" data-nav class="font-bold underline decoration-punk underline-offset-4">' + cards.nameSpan(state.creature) + '</a> <span class="font-mono text-small text-muted">' + cards.formatId(state.creature.creatureId) + '</span>'
+              : 'No Creature yet.') +
           '</span></li>' +
         '</ul>' +
         '<button type="button" class="btn-secondary mt-4" data-action="disconnect">Disconnect wallet</button>' +
@@ -291,6 +358,6 @@
   window.HOMESTEAD_SCREENS = {
     ROUTES: ROUTES,
     icon: icon,
-    render: { home: home, creature: creature, homestead: homestead, marketplace: marketplace, collection: collection, profile: profile },
+    render: { home: home, creature: creature, creatureById: creatureById, homestead: homestead, marketplace: marketplace, collection: collection, profile: profile },
   };
 })();

@@ -27,7 +27,11 @@
         notice: null, // 'seed-created' | 'creature-awakened' after one succeeds
         error: null, // what the last mint or awaken could not do
       },
-      creature: null, // this wallet's Genesis Creature
+      creature: null, // this wallet's Genesis Creature (lib/creatures.js shape)
+      // Every Creature this wallet owns (creatures.js).
+      collection: { status: 'idle', creatures: [] }, // status: 'idle' | 'loading' | 'ready' | 'error'
+      // The Creature open at /creature/<id> (creatures.js).
+      viewedCreature: { status: 'idle', id: null, creature: null, ownedByYou: false }, // status adds 'missing'
       seed: null, // this wallet's Genesis Seed
       homestead: null, // the Creature's home
       resources: {},

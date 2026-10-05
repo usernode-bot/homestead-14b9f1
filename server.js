@@ -3,6 +3,7 @@ const path = require('path');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const genesis = require('./lib/genesis');
+const creatures = require('./lib/creatures');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -182,7 +183,7 @@ function genesisWallet(req) {
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -214,6 +215,46 @@ app.post('/api/genesis/awaken', async (req, res) => {
   if (!Number.isInteger(seedId) || seedId < 1) return res.status(400).json({ error: 'bad_seed', message: 'Which Seed?' });
   try {
     res.json(await genesis.awaken(pool, wallet, seedId));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// Creatures (lib/creatures.js). Reading is open to anyone who can see the
+// app: a Creature is a public collectible. Renaming needs the owner's wallet.
+app.get('/api/creatures', async (req, res) => {
+  try {
+    res.json({ creatures: await creatures.listOwned(pool, genesisWallet(req)) });
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+function creatureIdParam(req) {
+  const id = Number(req.params.id);
+  return Number.isInteger(id) && id >= 1 ? id : null;
+}
+
+app.get('/api/creatures/:id', async (req, res) => {
+  const id = creatureIdParam(req);
+  if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+  try {
+    const creature = await creatures.getById(pool, id);
+    if (!creature) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+    const wallet = genesisWallet(req);
+    res.json({ creature, ownedByYou: !!wallet && creature.owner === wallet });
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/creatures/:id/name', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const id = creatureIdParam(req);
+  if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+  try {
+    res.json({ creature: await creatures.rename(pool, wallet, id, req.body && req.body.name) });
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -282,9 +323,27 @@ async function shutdown(signal) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+// Staging previews start with an empty (or copied) database, so give them one
+// obviously fake Creature to look at, made through the real Genesis -> Awaken
+// path for a fake wallet (never the visitor's). Idempotent: a reboot finds the
+// Genesis already used and changes nothing.
+const STAGING_DEMO_WALLET = 'ut1stagingdemowallet';
+async function seedStaging() {
+  const minted = await genesis.mint(pool, STAGING_DEMO_WALLET, 'staging-demo-user');
+  if (!minted.seed || minted.creature) return;
+  const awakened = await genesis.awaken(pool, STAGING_DEMO_WALLET, minted.seed.seedId);
+  if (awakened.created) {
+    await creatures.rename(pool, STAGING_DEMO_WALLET, awakened.creature.creatureId, 'Staging demo');
+  }
+}
+
 async function start() {
   // Each game system adds its own idempotent CREATE TABLE IF NOT EXISTS here.
   await genesis.ensureSchema(pool);
+  // Creatures awakened before the generator existed get their traits once.
+  const filled = await creatures.backfill(pool);
+  if (filled) console.log(`[creatures] filled in ${filled} earlier Creature(s)`);
+  if (IS_STAGING) await seedStaging().catch((err) => console.warn('[staging seed]', err.message));
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;

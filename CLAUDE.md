@@ -79,9 +79,9 @@ collectible; the Homestead is the Creature's home. It must never look like a
 farming simulator, medieval fantasy or a crypto dashboard.
 
 PR #1 built the foundation: navigation, the wallet area, the Home screen and
-placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). Species,
-stats, listings, breeding and transactions do not exist yet, and none may be
-faked.
+placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). PR #3 made
+the Creature a full collectible (below). Listings, breeding, work, training and
+transactions do not exist yet, and none may be faked.
 
 - **Genesis:** `lib/genesis.js` holds every rule, enforced in Postgres
   transactions: one Genesis per wallet (`genesis_wallets.genesis_used`, which
@@ -93,6 +93,17 @@ faked.
   `created_by` and `genesis_wallet` keep the history. `npm test` runs its
   tests against `DATABASE_URL` (a throwaway database: it drops the tables).
 
+- **Creatures:** everything a Creature is (name, Species, rarity, base stats,
+  personality, Gene, mutation, Trade, layered appearance) is rolled ONCE by
+  `lib/creature-generator.js` inside the Awaken transaction and stored on the
+  `creatures` row; a trigger refuses to change any of it afterwards. Only
+  `owner`, `level` and `name` can change, and only the owner renames
+  (`lib/creatures.js`). Every table and balance value is in
+  `public/js/creature-config.js`; the name rules are `public/js/creature-name.js`
+  (shared by page and server). The page only draws what is stored:
+  `public/js/creature-art.js` (SVG, colours are the `--art-*` tokens, artwork
+  only) and `public/js/creature-card.js` (card, profile). Future Training and
+  Gear add bonuses beside the `base_*` stats, never over them.
 - **Supply cap:** there can never be more than 5,000 Creatures.
   `MAX_CREATURE_SUPPLY` in `public/js/config.js` is the only place that number
   is written. The page reads it as `window.HOMESTEAD_CONFIG`, the server as
