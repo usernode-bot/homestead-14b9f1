@@ -8,6 +8,7 @@
   var homesteadView = window.HOMESTEAD_HOMESTEAD_VIEW;
   var steadConfig = window.HOMESTEAD_STEAD_CONFIG;
   var gearView = window.HOMESTEAD_GEAR_VIEW;
+  var contestView = window.HOMESTEAD_CONTEST_VIEW;
 
   function fmt(n) { return Number(n).toLocaleString('en-US'); }
 
@@ -21,16 +22,18 @@
     profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     gear: '<path d="M8 7V5a4 4 0 0 1 8 0v2"/><rect x="4" y="7" width="16" height="14" rx="3"/><path d="M9 13h6"/>',
+    contests: '<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>',
   };
   function icon(name, cls) {
     return '<svg class="' + (cls || 'h-5 w-5') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
   }
 
-  // The six screens, in navigation order.
+  // The screens in the nav, in navigation order.
   var ROUTES = [
     { path: '/', key: 'home', label: 'HOME' },
     { path: '/creature', key: 'creature', label: 'MY CREATURE' },
     { path: '/homestead', key: 'homestead', label: 'HOMESTEAD' },
+    { path: '/contests', key: 'contests', label: 'CONTESTS' },
     { path: '/marketplace', key: 'marketplace', label: 'MARKETPLACE' },
     { path: '/collection', key: 'collection', label: 'COLLECTION' },
     { path: '/profile', key: 'profile', label: 'PROFILE' },
@@ -370,6 +373,7 @@
     return {
       canRename: mine, canAct: mine, controls: v.controls,
       pending: v.pending, notice: v.notice, error: v.error, gear: state.gear,
+      contest: v.contest, canChallengeOwner: !mine && state.wallet.status === 'connected' && !!v.creature && v.creature.owner !== state.wallet.address,
     };
   }
 
@@ -486,6 +490,13 @@
     }
     return heading + homesteadLoading();
   }
+  // Contests between two players, /contests, and one Contest, /contests/<id>.
+  function contests(state, route) {
+    return contestView.page(state, pageHeading(route));
+  }
+  function contestById(state, route) {
+    return contestView.detail(state, pageHeading({ key: 'contests', label: 'CONTEST' }));
+  }
   function marketplace(state, route) {
     return placeholder(route, 'No Creatures listed yet.', 'Trading opens in a future update.');
   }
@@ -595,6 +606,6 @@
   window.HOMESTEAD_SCREENS = {
     ROUTES: ROUTES,
     icon: icon,
-    render: { home: home, gear: gear, creature: creature, creatureById: creatureById, homestead: homestead, homesteadById: homesteadById, marketplace: marketplace, collection: collection, profile: profile },
+    render: { home: home, gear: gear, contests: contests, contestById: contestById, creature: creature, creatureById: creatureById, homestead: homestead, homesteadById: homesteadById, marketplace: marketplace, collection: collection, profile: profile },
   };
 })();

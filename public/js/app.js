@@ -8,6 +8,8 @@
   var homesteads = window.HOMESTEAD_HOMESTEADS;
   var stead = window.HOMESTEAD_STEAD;
   var gear = window.HOMESTEAD_GEAR;
+  var contests = window.HOMESTEAD_CONTESTS;
+  var contestView = window.HOMESTEAD_CONTEST_VIEW;
   var steadConfig = window.HOMESTEAD_STEAD_CONFIG;
   var navEl = document.getElementById('nav');
   var walletEl = document.getElementById('wallet');
@@ -19,6 +21,8 @@
   var CREATURE_PATH = /^\/creature\/(\d{1,9})$/;
   // A Homestead by its number, /homestead/<id>, belongs under HOMESTEAD.
   var HOMESTEAD_PATH = /^\/homestead\/(\d{1,9})$/;
+  // A Contest by its number, /contests/<id>, belongs under CONTESTS.
+  var CONTEST_PATH = /^\/contests\/(\d{1,9})$/;
 
   function currentRoute() {
     var path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -32,6 +36,10 @@
       var home = screens.ROUTES.find(function (r) { return r.key === 'homestead'; });
       return { path: path, key: 'homesteadById', label: 'HOMESTEAD', nav: home, homesteadId: Number(hm[1]) };
     }
+    var cm = CONTEST_PATH.exec(path);
+    if (cm) {
+      return { path: path, key: 'contestById', label: 'CONTEST', nav: screens.ROUTES.find(function (r) { return r.key === 'contests'; }), contestId: Number(cm[1]) };
+    }
     // The Gear inventory is opened from the Homestead, and sits under it.
     if (path === '/gear') {
       return { path: path, key: 'gear', label: 'GEAR', nav: screens.ROUTES.find(function (r) { return r.key === 'homestead'; }) };
@@ -40,10 +48,17 @@
   }
 
   function renderNav(route) {
+    // Challenges waiting for this player show as a count on CONTESTS.
+    var c = store.get().contests;
+    var waiting = store.get().wallet.status === 'connected' && c.status === 'ready' ? c.incoming.length : 0;
     navEl.innerHTML = screens.ROUTES.map(function (r) {
       return '<li><a href="' + r.path + '" data-nav class="nav-tab"' +
-        (r === route || (r === route.nav && (route.homesteadId || route.key === 'gear' || store.get().viewedCreature.ownedByYou)) ? ' aria-current="page"' : '') + '>' +
-        screens.icon(r.key, 'h-4 w-4') + r.label + '</a></li>';
+        (r === route || (r === route.nav && (route.homesteadId || route.contestId || route.key === 'gear' || store.get().viewedCreature.ownedByYou)) ? ' aria-current="page"' : '') + '>' +
+        screens.icon(r.key, 'h-4 w-4') + r.label +
+        (r.key === 'contests' && waiting
+          ? '<span class="rounded-full bg-punk px-1.5 text-small font-black tabular-nums text-ground" data-contest-badge="' + waiting + '">' + waiting + '<span class="sr-only"> ' + (waiting === 1 ? 'challenge' : 'challenges') + ' waiting</span></span>'
+          : '') +
+        '</a></li>';
     }).join('');
     var active = navEl.querySelector('[aria-current="page"]');
     if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -151,13 +166,29 @@
     if (route.key === 'homestead') homesteads.open();
     // The Gear inventory, for the Gear screen and the owner's Gear picker.
     if (route.key === 'gear' || route.creatureId || ownId) gear.ensure();
+    if (route.key === 'contests') contests.ensure();
+    if (route.contestId) contests.view(route.contestId);
     var state = store.get();
     document.title = route.label === 'HOME' || route.label === 'HOMESTEAD' ? 'HOMESTEAD' : route.label + ' · HOMESTEAD';
     renderNav(route);
     renderWallet(state);
     renderStead(state);
+    // A re-render (another player's move arriving) keeps the field being typed in.
+    var focused = document.activeElement && viewEl.contains(document.activeElement) && document.activeElement.id ? document.activeElement : null;
+    var focusId = focused ? focused.id : null;
+    var selection = focused && typeof focused.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd] : null;
     viewEl.innerHTML = screens.render[route.key](state, route);
     fillFields(state);
+    contestView.fill(viewEl);
+    if (focusId) {
+      var again = document.getElementById(focusId);
+      if (again) {
+        again.focus({ preventScroll: true });
+        if (selection && typeof again.setSelectionRange === 'function') {
+          try { again.setSelectionRange(selection[0], selection[1]); } catch (_) {}
+        }
+      }
+    }
   }
 
   // A Gear message or open slot picker belongs to the screen it was made on.
@@ -171,7 +202,9 @@
     history.pushState(null, '', path + window.location.search);
     walletMenuOpen = false;
     clearGearMessages();
+    contests.clearMessages();
     refreshCreature();
+    if (CONTEST_PATH.test(path)) contests.view(Number(CONTEST_PATH.exec(path)[1]), true, true);
     render();
     window.scrollTo(0, 0);
     viewEl.focus({ preventScroll: true });
@@ -210,6 +243,20 @@
       else if (name === 'gear-choose-cancel') gear.cancelChoose();
       else if (name === 'gear-equip') gear.equip(Number(action.dataset.creatureId), Number(action.dataset.gearId), action.dataset.slot);
       else if (name === 'gear-unequip') gear.unequip(Number(action.dataset.creatureId), action.dataset.slot);
+      else if (name === 'contests-retry') contests.load();
+      else if (name === 'contest-view-retry') contests.view(currentRoute().contestId, true);
+      else if (name === 'contest-accept-start') contests.startAccept(Number(action.dataset.challengeId));
+      else if (name === 'contest-accept-cancel') contests.stopAccept();
+      else if (name === 'contest-accept') contests.accept(Number(action.dataset.challengeId));
+      else if (name === 'contest-decline') contests.decline(Number(action.dataset.challengeId));
+      else if (name === 'contest-cancel') contests.cancel(Number(action.dataset.challengeId));
+      else if (name === 'contest-prefill') {
+        // From a Creature's profile: challenge with it, or challenge its owner.
+        var shown = store.get().viewedCreature.creature;
+        if (action.dataset.creatureId) contests.prefill({ creatureId: Number(action.dataset.creatureId) });
+        else if (shown && Number(action.dataset.opponentOf) === shown.creatureId) contests.prefill({ opponent: shown.owner });
+        navigate('/contests');
+      }
       else if (name === 'rename') {
         var holder = action.closest('[data-creature-id]');
         creatures.openRename(holder && creatureFor(Number(holder.dataset.creatureId)));
@@ -227,6 +274,7 @@
   });
   window.addEventListener('popstate', function () { clearGearMessages(); refreshCreature(); render(); });
   store.subscribe(render);
+  window.HOMESTEAD_APP = { navigate: navigate };
 
   render();
   genesis.load();

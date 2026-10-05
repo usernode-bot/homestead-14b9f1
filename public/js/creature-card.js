@@ -177,6 +177,7 @@
     var gearBonus = care.gearBonuses(c);
     var effective = care.effectiveStats(c);
     var working = !!(ctl && ctl.working);
+    var inContest = !!(ctl && ctl.inContest);
     var poor = !!(ctl && Number(ctl.steadBalance) < care.TRAINING_COST);
     var busy = !!opts.pending;
     var head = '';
@@ -187,6 +188,7 @@
           '<span class="text-small text-muted">You have <span class="font-bold tabular-nums text-fg" data-training-stead>' + (ctl ? Number(ctl.steadBalance).toLocaleString('en-US') : '…') + '</span> STEAD</span>' +
         '</li>' +
         (working ? '<li class="list-row"><p class="text-body font-bold" data-training-blocked="working">Creature is working. Training unavailable.</p></li>'
+          : inContest ? '<li class="list-row"><p class="text-body font-bold" data-training-blocked="contest">Creature is in a contest. Training unavailable.</p></li>'
           : poor ? '<li class="list-row"><p class="text-body text-muted" data-training-blocked="stead">Need ' + care.TRAINING_COST + ' STEAD to train. Daily Check-in on Home pays STEAD.</p></li>' : '') +
         (opts.notice && opts.notice.kind === 'trained' ? '<li class="list-row"><p class="text-body font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p></li>' : '');
     }
@@ -200,7 +202,7 @@
         var pending = opts.pending === 'train:' + s.key;
         button = '<button type="button" class="btn-secondary w-full whitespace-nowrap px-3 sm:w-40" data-action="train" data-stat="' + s.key + '"' +
           ' aria-label="Train ' + s.label + ' for ' + care.TRAINING_COST + ' STEAD"' +
-          (!ctl || atMax || working || poor || busy ? ' disabled' : '') + '>' +
+          (!ctl || atMax || working || inContest || poor || busy ? ' disabled' : '') + '>' +
           (atMax ? 'MAX TRAINING' : pending ? 'TRAINING…' : '+ TRAIN') + '</button>';
       }
       return '<li class="list-row flex-wrap gap-x-4 gap-y-2" data-training-stat="' + s.key + '">' +
@@ -221,14 +223,40 @@
     '</section>';
   }
 
-  // The whole profile: hero; hunger and identity side by side; Gear; then
-  // stats and training.
-  // opts: { canRename, canAct, controls, pending, notice, error, gear }
+  // Whether the Creature can compete right now (lib/contests.js availability),
+  // with CHALLENGE for its owner, or CHALLENGE OWNER for another connected
+  // player. opts: { contest, canAct, canChallengeOwner }
+  function contestSection(c, opts) {
+    var a = opts.contest;
+    if (!a) return '';
+    var row;
+    if (a.status === 'in_contest') {
+      row = '<span class="text-body font-black" data-contest-availability="in_contest">IN CONTEST</span>' +
+        '<a href="/contests/' + Number(a.contestId) + '" data-nav class="btn-secondary">View contest</a>';
+    } else if (a.status === 'working') {
+      row = '<span><span class="block text-body font-black" data-contest-availability="working">WORKING</span>' +
+        '<span class="block text-small text-muted">Contests unavailable</span></span>';
+    } else {
+      var button = opts.canAct
+        ? '<button type="button" class="btn-secondary" data-action="contest-prefill" data-creature-id="' + Number(c.creatureId) + '">CHALLENGE</button>'
+        : opts.canChallengeOwner
+          ? '<button type="button" class="btn-secondary" data-action="contest-prefill" data-opponent-of="' + Number(c.creatureId) + '">CHALLENGE OWNER</button>'
+          : '';
+      row = '<span class="text-body" data-contest-availability="ready">Ready to compete.</span>' + button;
+    }
+    return '<section data-contest-section><h3 class="section-label">Contests</h3><ul class="list">' +
+      '<li class="list-row flex-wrap justify-between gap-3">' + row + '</li></ul></section>';
+  }
+
+  // The whole profile: hero; Contests; hunger and identity side by side;
+  // Gear; then stats and training.
+  // opts: { canRename, canAct, controls, pending, notice, error, gear, contest, canChallengeOwner }
   function profile(c, opts) {
     opts = opts || {};
     return '<div class="max-w-3xl" data-creature-profile="' + Number(c.creatureId) + '">' +
       hero(c, opts) +
       (opts.error ? '<p role="alert" class="mt-4 px-1 text-small text-danger" data-field="care-error"></p>' : '') +
+      (opts.contest ? '<div class="mt-8">' + contestSection(c, opts) + '</div>' : '') +
       '<div class="mt-8 grid gap-6 md:grid-cols-2">' +
         feedingSection(c, opts) +
         '<section><h3 class="section-label">Identity</h3>' + identityList(c) + '</section>' +

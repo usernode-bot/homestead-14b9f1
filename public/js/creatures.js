@@ -36,7 +36,7 @@
     if (!force && v.id === id && v.status !== 'error') return;
     var seq = ++viewSeq;
     if (!quiet || v.id !== id) {
-      store.update('viewedCreature', { status: 'loading', id: id, creature: null, ownedByYou: false, controls: null, pending: null, notice: null, error: null });
+      store.update('viewedCreature', { status: 'loading', id: id, creature: null, ownedByYou: false, controls: null, contest: null, pending: null, notice: null, error: null });
     }
     try {
       var res = await wallet.api('/api/creatures/' + id);
@@ -53,7 +53,7 @@
         store.update('viewedCreature', { status: 'missing' });
         return;
       }
-      store.update('viewedCreature', { status: 'ready', creature: data.creature, ownedByYou: data.ownedByYou, controls: data.controls || null });
+      store.update('viewedCreature', { status: 'ready', creature: data.creature, ownedByYou: data.ownedByYou, controls: data.controls || null, contest: data.contest || null });
     } catch (err) {
       if (seq !== viewSeq) return;
       if (!quiet) store.update('viewedCreature', { status: 'error' });
