@@ -95,16 +95,12 @@
         </svg>
         <span class="text-heading font-black tracking-tight">HOMESTEAD</span>
       </a>
+      <!-- One button: the signed-in player's name, opening their profile
+           (wallet and STEAD live there), or CONNECT with no wallet. -->
       <div id="wallet" class="relative ml-auto xl:order-last"></div>
-      <!-- The screens, then the connected wallet's STEAD balance ("—"
-           with no wallet). On small screens they share the second row and
-           the tabs scroll sideways beside the balance. -->
-      <div class="order-last flex w-full items-center gap-2 xl:order-none xl:w-auto xl:flex-1">
-        <nav aria-label="Main" class="min-w-0 flex-1 overflow-x-auto xl:overflow-visible">
-          <ul id="nav" class="flex gap-1"></ul>
-        </nav>
-        <a href="/profile" data-nav id="stead-balance" class="flex min-h-11 shrink-0 flex-col justify-center rounded-xl border border-line px-2.5 leading-tight hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"></a>
-      </div>
+      <nav aria-label="Main" class="order-last w-full min-w-0 overflow-x-auto xl:order-none xl:w-auto xl:flex-1 xl:overflow-visible">
+        <ul id="nav" class="flex gap-1"></ul>
+      </nav>
     </div>
   </header>
 
