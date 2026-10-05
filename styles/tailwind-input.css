@@ -13,46 +13,30 @@
 @tailwind utilities;
 
 /* ── Colour tokens ────────────────────────────────────────────────────────
- * This app's palette, defined once. Each value is "R G B"; tailwind.config.js
+ * HOMESTEAD's palette, defined once. Each value is "R G B"; tailwind.config.js
  * names them (bg-ground, bg-surface, text-fg, text-muted, border-line,
- * bg-accent with text-on-accent, ...). :root is the light look, and .dark,
- * which the theme script in public/index.html sets on <html>, the dark one.
+ * bg-accent with text-on-accent, text-punk, ...).
  *
- * Re-theme the app HERE: change the values, keep the names. The defaults
- * (warm greys, one teal accent) are a quiet starting point, not a look.
- * Keep every text pair at 4.5:1 or more in both looks: fg and muted on
- * ground, surface and raised; accent and danger on ground and surface;
- * on-accent on accent; on-danger on danger.
- *
- * Adopting the native UI kit later? Point its --un-accent and
- * --un-accent-contrast at the accent and on-accent tokens.
+ * HOMESTEAD has ONE fixed look, dark (see "## Design" in CLAUDE.md), so the
+ * tokens are set once on :root and do not change with the viewer's theme.
+ * Keep every text pair at 4.5:1 or more: fg and muted on ground, surface and
+ * raised; accent, punk and danger on ground and surface; on-accent on accent.
  */
 @layer base {
   :root {
-    --ground: 250 250 249;    /* the page */
-    --surface: 255 255 255;   /* lists, cards, fields */
-    --raised: 245 245 244;    /* hovers, badges */
-    --fg: 28 25 23;           /* text */
-    --muted: 87 83 78;        /* secondary text */
-    --line: 231 229 228;      /* borders, dividers, skeletons */
-    --accent: 15 118 110;     /* the one accent */
-    --on-accent: 255 255 255; /* text on the accent */
-    --danger: 185 28 28;
-    --on-danger: 255 255 255;
-    --focus: 13 148 136;      /* the keyboard focus ring */
-  }
-  .dark {
-    --ground: 12 10 9;
-    --surface: 28 25 23;
-    --raised: 41 37 36;
-    --fg: 245 245 244;
-    --muted: 168 162 158;
-    --line: 68 64 60;
-    --accent: 45 212 191;
-    --on-accent: 4 47 46;
+    --ground: 15 13 22;       /* the page: ink with a violet cast */
+    --surface: 26 23 37;      /* panels, cards, fields */
+    --raised: 38 34 54;       /* hovers, badges */
+    --fg: 246 244 251;        /* text */
+    --muted: 170 164 190;     /* secondary text */
+    --line: 61 55 82;         /* borders, dividers, skeletons */
+    --accent: 190 242 100;    /* acid lime: the one accent, primary action */
+    --on-accent: 20 26 6;     /* text on the accent */
+    --punk: 255 110 196;      /* hot pink: stickers, stitches, the mascot */
     --danger: 248 113 113;
     --on-danger: 69 10 10;
-    --focus: 94 234 212;
+    --focus: 217 249 157;     /* the keyboard focus ring */
+    color-scheme: dark;
   }
   /* el.hidden = true hides an element even when a class gives it a display
      (flex, the components below). */
@@ -72,7 +56,7 @@
      each way, so they are easy to tap. */
   .btn-primary,
   .btn-secondary {
-    @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-4 text-body font-medium
+    @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 text-body font-bold tracking-wide
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
       focus-visible:ring-offset-ground disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -102,6 +86,30 @@
      screens need none. Never put a card inside a card or a .list. */
   .card {
     @apply rounded-xl border border-line bg-surface p-4;
+  }
+
+  /* HOMESTEAD's collectible card: a thick-bordered rounded panel with a
+     dashed pink "stitch" inset, like a trading card in a sleeve. */
+  .collectible {
+    @apply relative rounded-2xl border-2 border-line bg-surface p-5;
+  }
+  .collectible::before {
+    content: '';
+    @apply pointer-events-none absolute inset-1.5 rounded-xl border border-dashed border-punk/40;
+  }
+
+  /* A sticker: a small tilted label slapped on a panel. */
+  .sticker {
+    @apply inline-block -rotate-2 rounded-md bg-punk px-2.5 py-1 text-small font-black tracking-wide text-ground;
+  }
+
+  /* Navigation tabs: <a class="nav-tab" aria-current="page">. */
+  .nav-tab {
+    @apply inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-small font-bold tracking-wide text-muted
+      hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus;
+  }
+  .nav-tab[aria-current='page'] {
+    @apply bg-fg text-ground hover:bg-fg hover:text-ground;
   }
 
   /* The label above a section: sentence case, never uppercase or tracked. */

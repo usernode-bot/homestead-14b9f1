@@ -58,87 +58,78 @@ this check for you and tells you when you are behind. It is silent offline, so
 its silence is not proof the checkout is current. Inside Homeroom's dev-chat
 the platform fixes the base commit, and none of this applies.
 
-## Starter template
+## Light and dark
 
-The screen this app currently ships — the hero, the "What's already
-working" card, and the Press! example (the demo markup in
-`public/index.html`, the `/api/press` and `/api/leaderboard` routes, and
-the `presses` table bootstrap in `server.js`) — is placeholder content
-from the Homeroom starter template, not product intent.
-
-When the user asks for their first real feature, REPLACE the template
-screen rather than building alongside it:
-
-- remove the `usernode-starter-notice@1` block in `public/index.html`
-  (both sentinel comments and everything between them),
-- remove or repurpose the "Try the example" card, its demo endpoints and
-  the `presses` table as appropriate,
-- rewrite `README.md` to describe the actual app.
-
-Keep the `usernode-dev-console@1` forwarder `<script>` when rewriting the
-HTML — that block is platform infrastructure, not template content. So is
-the bridge `<script>`. The design kit is not placeholder either: build the
-real app with it, and fill in "## Design" below.
-
-The screen has a light and a dark look and follows the viewer's Homeroom
-theme, switching live when they change it: the theme `<script>` right after
-the bridge tag sets a `dark` class on `<html>`. Keep that script, and give
-everything you build both looks (the design kit's colour tokens carry both), unless one
-fixed look is the point of this app, like a game's own scene; then say so
-under "## Design" below. Unless a request asks for one, add
-no theme picker: the viewer's Homeroom setting is the control. "The
-platform's light/dark theme inside the app frame" in the platform
-conventions has the details.
+HOMESTEAD has one fixed dark look (see "## Design"), so `<html>` carries the
+`dark` class permanently and does not follow the viewer's Homeroom theme. Keep
+the bridge `<script>` and the `usernode-dev-console@1` forwarder in
+`public/index.html`: both are platform infrastructure.
 
 If a rule below this line conflicts with the hosted conventions, the
-hosted conventions win. This file is **app-specific** — write down
-things about *this* app that belong in the repo: product intent,
-data-model quirks, style preferences, opt-in policies (e.g. which
-tables you've marked private), etc.
+hosted conventions win. This file is **app-specific**.
 
 ---
 
 ## About HOMESTEAD
 
-Collectible game where you raise, train, and battle cute little monsters in your homestead
+**Awaken a Monster. Give it a Home. Make it Yours.**
 
-_(add a sentence or two more of product context here so Claude Code has a
-shared understanding of what this app is for)_
+A collectible game about cute, strange punk monsters. The Creature is the
+collectible; the Homestead is the Creature's home. It must never look like a
+farming simulator, medieval fantasy or a crypto dashboard.
+
+PR #1 built only the foundation: navigation, the wallet area, the Home screen
+and placeholder screens. No Creatures, Genesis, listings, breeding or
+transactions exist yet, and none may be faked.
+
+- **Supply cap:** there can never be more than 5,000 Creatures.
+  `MAX_CREATURE_SUPPLY` in `public/js/config.js` is the only place that number
+  is written. The page reads it as `window.HOMESTEAD_CONFIG`, the server as
+  `require('./public/js/config')`. Every Creature creation system must check it.
+- **Game state:** `public/js/state.js` is the one store (`HOMESTEAD_STORE`),
+  with a slot per future system (wallet, supply, creature, seed, homestead,
+  resources, homePoints, gear, contests, marketplace, breeding). A new system
+  fills its slot; screens read the store and re-render on `subscribe`.
+- **Wallet:** CONNECT WALLET reads the wallet linked to the signed-in Homeroom
+  account from `GET /api/me` (`req.user.usernode_pubkey`, verified by the
+  server). Nothing is signed or sent. Disconnect forgets it on this device.
+  Do not use the bridge's `getNodeAddress()` for this outside the native app:
+  it falls back to a random mock address.
+- **Screens:** `public/js/screens.js` (one render function per route),
+  `public/js/app.js` (router, nav, wallet area). Routes are clean paths
+  (`/`, `/creature`, `/homestead`, `/marketplace`, `/collection`, `/profile`);
+  the server's catch-all serves `index.html` for each.
+- **Content rules:** Homeroom apps may not include combat or fantasy violence,
+  so head-to-head play is called "compete"/"contests", not battles. Design it
+  as non-violent contests (races, talent shows, puzzles), and keep any Genesis
+  or reward randomness free of paid loot-box mechanics.
 
 ## Design
 
-This app's look. The first real version fills in the blanks; every later
-change follows it, and updates it when a request changes the look on purpose.
+- **Palette:** accent acid lime (`accent`, primary action and progress only);
+  second colour hot pink (`punk`: stickers, stitches, icons, the mascot);
+  neutrals violet-tinted ink greys.
+- **Signature element:** the punk-monster mascot (a pink blob with a lime
+  mohawk and one eye) in the wordmark, plus `collectible` panels with a dashed
+  pink "stitch" and tilted pink `sticker` labels.
+- **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`, plus
+  `text-display` for the wordmark and the supply count only. Headings and nav
+  are heavy (`font-black`/`font-bold`); nav labels and the supply sticker are
+  uppercase by the owner's request.
+- **One fixed look:** dark. A collectible game drawn as its own scene; the owner
+  asked for a dark UI. Tokens are set once on `:root`.
 
-- **Palette:** _(name the accent, any second colour and the neutrals, e.g.
-  "accent: tomato red; second: basil green; neutrals: warm greys")_
-- **Signature element:** _(the one thing on screen drawn from this app's
-  subject, which no other app would have)_
-- **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
-  _(change their sizes in `tailwind.config.js` if you must, not their number)_
-- **One fixed look:** _(only for an app drawn as its own scene, such as a
-  game: which look, and why. Otherwise delete this line.)_
+The kit is in `styles/tailwind-input.css`: colour tokens (named in
+`tailwind.config.js`) and components (`btn-primary`, `btn-secondary`, `field`,
+`list`/`list-row`, `card`, `collectible`, `sticker`, `nav-tab`,
+`section-label`, `skeleton`, `state-empty`, `state-error`).
 
-The kit is in `styles/tailwind-input.css`: colour tokens with a light and
-a dark value (named in `tailwind.config.js`), and a few components
-(`btn-primary`, `btn-secondary`, `field`, `list` and `list-row`,
-`card`, `section-label`, `skeleton`, `state-empty`, `state-error`).
-Re-theme by changing the token values there, keeping every text pair at
-4.5:1 or more in both looks.
-
-- Colour comes only from the tokens (`bg-ground`, `bg-surface`,
-  `text-fg`, `text-muted`, `border-line`, `bg-accent` with
-  `text-on-accent`, ...): never a raw hex value or a stock palette class.
-- Tap targets are at least 44 px; the buttons and fields already are.
+- Colour comes only from the tokens: never a raw hex value or a stock palette class.
+- Tap targets are at least 44 px; the buttons, fields and nav tabs already are.
 - Every screen that loads data has honest loading, empty and error states.
-  Never show the empty state while loading or after a failure; an error says
-  what failed, what still works, and offers Retry.
-- Seed obviously fake staging demo data so the populated screen can be seen
-  ("Staging mock data" in the platform conventions).
-- No cards in cards, no uppercase eyebrows, no emoji as icons.
+- No cards in cards, no emoji as icons.
 
 ## App-specific conventions
 
-_(optional — e.g. "all currency values stored as integer cents, not
-floats"; "the `posts` table is append-only"; "avoid adding new
-dependencies"; etc.)_
+- No game tables exist yet. Add each with `CREATE TABLE IF NOT EXISTS` in
+  `start()` in `server.js`.

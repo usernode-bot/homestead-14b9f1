@@ -52,16 +52,19 @@ module.exports = {
         line: token('line'), // borders, dividers, skeletons
         accent: token('accent'), // the one accent: the primary action
         'on-accent': token('on-accent'), // text on the accent
+        punk: token('punk'), // hot pink: stickers, stitches, the mascot
         danger: token('danger'),
         'on-danger': token('on-danger'),
         focus: token('focus'), // the keyboard focus ring
       },
-      // The type scale: four sizes, and nothing in between.
+      // The type scale: four sizes plus display, and nothing in between.
       fontSize: {
         small: ['0.875rem', { lineHeight: '1.25rem' }],
         body: ['1rem', { lineHeight: '1.5rem' }],
         heading: ['1.25rem', { lineHeight: '1.75rem', fontWeight: '600' }],
         title: ['1.75rem', { lineHeight: '2.25rem', fontWeight: '700' }],
+        // HOMESTEAD's wordmark and the supply count, and nothing else.
+        display: ['3rem', { lineHeight: '1', fontWeight: '900', letterSpacing: '-0.03em' }],
       },
     },
   },
