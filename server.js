@@ -444,10 +444,23 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // obviously fake Creature to look at, made through the real Genesis -> Awaken
 // path for a fake wallet (never the visitor's). Idempotent: a reboot finds the
 // Genesis already used and changes nothing.
-const STAGING_DEMO_WALLET = 'ut1stagingdemowallet';
+// The demo Homestead always has the number STAGING_DEMO_HOMESTEAD_ID, so the
+// dapp.json checks can open /homestead/900001 whatever real Homesteads the
+// copied production database already holds (they took the low numbers, so
+// /homestead/1 is a real player's). The wallet is new for that reason too: a
+// staging database that already gave the earlier demo wallet
+// (ut1stagingdemowallet) a low number keeps it, since numbers never change.
+const STAGING_DEMO_WALLET = 'ut1stagingdemohomestead';
+const STAGING_DEMO_HOMESTEAD_ID = 900001;
 async function seedStaging() {
   const minted = await genesis.mint(pool, STAGING_DEMO_WALLET, 'staging-demo-user');
   if (minted.seed && !minted.creature) await awakenDemo(minted.seed.seedId);
+  // Reserve the demo Homestead's number (the sequence never reaches it), then
+  // let the real open path fill in its buildings and move the Creature in.
+  await pool.query(
+    'INSERT INTO homesteads (id, owner, storage) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+    [STAGING_DEMO_HOMESTEAD_ID, STAGING_DEMO_WALLET, JSON.stringify(require('./public/js/homestead-config').emptyStorage())]
+  );
   // The demo Creature's Homestead, made the same way an owner opening it does.
   const opened = await homestead.open(pool, STAGING_DEMO_WALLET);
   // Send the demo Creature to work once, through the real path, an hour ago
