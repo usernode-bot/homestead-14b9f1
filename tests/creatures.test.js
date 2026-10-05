@@ -8,8 +8,8 @@ const cfg = require('../public/js/creature-config');
 const names = require('../public/js/creature-name');
 const generator = require('../lib/creature-generator');
 const genesis = require('../lib/genesis');
+const { fundAndMint } = require('./support');
 const creatures = require('../lib/creatures');
-const { MAX_CREATURE_SUPPLY } = require('../public/js/config');
 
 test('name validator', () => {
   assert.deepStrictEqual(names.validate('  Bambang  '), { ok: true, name: 'Bambang' });
@@ -69,12 +69,12 @@ test('Creatures in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query('DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creatures, seeds, genesis_wallets, creature_supply CASCADE');
+    await pool.query('DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creatures, seeds, genesis_wallets, stead_ledger, stead_accounts CASCADE');
     await genesis.ensureSchema(pool);
     await genesis.ensureSchema(pool);
   }
   async function awakenFor(wallet) {
-    const m = await genesis.mint(pool, wallet, wallet);
+    const m = await fundAndMint(pool, wallet, wallet);
     return genesis.awaken(pool, wallet, m.seed.seedId);
   }
 
@@ -109,7 +109,7 @@ test('Creatures in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async
     const s = await genesis.getState(pool, 'ut1alice');
     assert.strictEqual(s.creature.name, 'Bruno Two');
     assert.strictEqual(s.genesis.genesisUsed, true, 'renaming never resets Genesis');
-    assert.strictEqual(s.supply.created, 1);
+    assert.strictEqual(s.slots.creatures, 1);
     const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM creatures');
     assert.strictEqual(rows[0].n, 1, 'renaming never creates a Creature');
   });
@@ -141,7 +141,7 @@ test('Creatures in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async
     await reset();
     const wallets = Array.from({ length: 12 }, (_, i) => 'ut1w' + i);
     const seeds = [];
-    for (const w of wallets) seeds.push((await genesis.mint(pool, w, w)).seed.seedId);
+    for (const w of wallets) seeds.push((await fundAndMint(pool, w, w)).seed.seedId);
     const results = await Promise.all(wallets.map((w, i) => genesis.awaken(pool, w, seeds[i])));
     const ids = results.map((r) => r.creature.creatureId);
     const genes = results.map((r) => r.creature.gene);
@@ -152,8 +152,8 @@ test('Creatures in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async
   await t.test('a Gene that is taken is never reused', async () => {
     await reset();
     // The same seeded rng twice would produce the same Gene first.
-    const m1 = await genesis.mint(pool, 'ut1a', 'a');
-    const m2 = await genesis.mint(pool, 'ut1b', 'b');
+    const m1 = await fundAndMint(pool, 'ut1a', 'a');
+    const m2 = await fundAndMint(pool, 'ut1b', 'b');
     const a = await genesis.awaken(pool, 'ut1a', m1.seed.seedId, generator.seededRng('same'));
     const b = await genesis.awaken(pool, 'ut1b', m2.seed.seedId, generator.seededRng('same'));
     assert.strictEqual(a.creature.species, b.creature.species);
@@ -162,11 +162,11 @@ test('Creatures in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async
 
   await t.test('a failed Awaken leaves nothing behind', async () => {
     await reset();
-    const m = await genesis.mint(pool, 'ut1alice', 7);
+    const m = await fundAndMint(pool, 'ut1alice', 7);
     const broken = () => { throw new Error('boom'); };
     await assert.rejects(genesis.awaken(pool, 'ut1alice', m.seed.seedId, broken));
     const s = await genesis.getState(pool, 'ut1alice');
-    assert.strictEqual(s.supply.created, 0);
+    assert.strictEqual(s.slots.creatures, 0);
     assert.strictEqual(s.creature, null);
     assert.strictEqual(s.seed.status, 'DORMANT');
     const ok = await genesis.awaken(pool, 'ut1alice', m.seed.seedId);
@@ -190,12 +190,11 @@ test('Creatures in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async
     assert.deepStrictEqual(await creatures.getById(pool, c.creatureId), filled);
   });
 
-  await t.test('the cap still holds with the generator', async () => {
+  await t.test('there is no global Creature cap', async () => {
     await reset();
-    await pool.query('UPDATE creature_supply SET created = $1', [MAX_CREATURE_SUPPLY - 1]);
-    await awakenFor('ut1last');
-    await assert.rejects(awakenFor('ut1late'), { code: 'sold_out' });
-    const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM creatures');
-    assert.strictEqual(rows[0].n, 1);
+    await pool.query("SELECT setval('creatures_id_seq', 5000)");
+    const a = await awakenFor('ut1last');
+    assert.strictEqual(a.creature.creatureId, 5001);
+    assert.ok(a.creature.gene);
   });
 });

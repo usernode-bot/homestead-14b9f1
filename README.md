@@ -3,16 +3,16 @@
 **Awaken a Monster. Give it a Home. Make it Yours.**
 
 A collectible game about cute, strange punk monsters, built on Homeroom.
-There will only ever be 5,000 Creatures.
+Each wallet can own up to 10 Creatures; Genesis costs 5,000 STEAD.
 
 This is the foundation (PR #1): navigation, a Homeroom wallet connection,
-the Home screen with the supply counter (0 / 5,000) and placeholder screens
+the Home screen with a Creature counter and placeholder screens
 for My Creature, Homestead, Marketplace, Collection and Profile. No gameplay
 exists yet.
 
 ## Layout
 
-- `public/js/config.js`: game-wide constants, including `MAX_CREATURE_SUPPLY`
+- `public/js/config.js`: game-wide constants, `MAX_OWNED_CREATURES` and `GENESIS_COST`
   (shared by the page and the server).
 - `public/js/state.js`: the central game-state store, one slot per system.
 - `public/js/wallet.js`: connect/disconnect, using the wallet linked to the

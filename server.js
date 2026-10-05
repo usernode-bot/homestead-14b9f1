@@ -10,6 +10,7 @@ const stead = require('./lib/stead');
 const care = require('./lib/care');
 const gear = require('./lib/gear');
 const contests = require('./lib/contests');
+const ownership = require('./lib/ownership');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -183,13 +184,14 @@ app.get('/api/me', (req, res) => {
 
 // Genesis -> Seed -> Awaken (lib/genesis.js). The wallet is always the one
 // the platform's verified token links to this account, never one the browser
-// names. Reading works for guests (supply only); writes need a linked wallet.
+// names. Guests read { genesis: null, slots: null, ... }; writes need a linked
+// wallet.
 function genesisWallet(req) {
   return req.user && req.user.usernode_pubkey ? req.user.usernode_pubkey : null;
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError || err instanceof gear.GearError || err instanceof contests.ContestError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError || err instanceof gear.GearError || err instanceof contests.ContestError || err instanceof ownership.OwnershipError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -208,7 +210,7 @@ app.post('/api/genesis/mint', async (req, res) => {
   const wallet = genesisWallet(req);
   if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
   try {
-    res.json(await genesis.mint(pool, wallet, req.user.id));
+    res.json(await genesis.mint(pool, wallet, req.user.id, { requestId: req.body && req.body.requestId }));
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -623,7 +625,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // Staging previews start with an empty (or copied) database, so give them one
 // obviously fake Creature to look at, made through the real Genesis -> Awaken
 // path for a fake wallet (never the visitor's). Idempotent: a reboot finds the
-// Genesis already used and changes nothing.
+// wallet already holding its Creature and changes nothing.
 // The demo Homestead always has the number STAGING_DEMO_HOMESTEAD_ID, so the
 // dapp.json checks can open /homestead/900001 whatever real Homesteads the
 // copied production database already holds (they took the low numbers, so
@@ -632,9 +634,26 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // (ut1stagingdemowallet) a low number keeps it, since numbers never change.
 const STAGING_DEMO_WALLET = 'ut1stagingdemohomestead';
 const STAGING_DEMO_HOMESTEAD_ID = 900001;
+// A fake wallet's first Creature, through the real Genesis -> Awaken path:
+// Genesis costs STEAD, so the fake wallet is paid exactly that once (a keyed
+// ledger entry), and only while it holds nothing. Never the visitor's wallet.
+// Answers the Creature it awakened now, or null.
+async function stagingGenesis(wallet, user) {
+  let state = await genesis.getState(pool, wallet);
+  if (!state.slots.owned) {
+    await stead.creditStead(pool, wallet, require('./public/js/config').GENESIS_COST, 'DAILY_CHECKIN',
+      { staging: true }, { key: 'STAGING-GENESIS-1' }).catch((err) => { if (err.code !== 'duplicate_entry') throw err; });
+    state = await genesis.mint(pool, wallet, user, { requestId: 'staging-genesis-1' });
+  }
+  if (state.seed && !state.creature) {
+    const awakened = await genesis.awaken(pool, wallet, state.seed.seedId);
+    if (awakened.created) return awakened.creature;
+  }
+  return null;
+}
 async function seedStaging() {
-  const minted = await genesis.mint(pool, STAGING_DEMO_WALLET, 'staging-demo-user');
-  if (minted.seed && !minted.creature) await awakenDemo(minted.seed.seedId);
+  const awakened = await stagingGenesis(STAGING_DEMO_WALLET, 'staging-demo-user');
+  if (awakened) await creatures.rename(pool, STAGING_DEMO_WALLET, awakened.creatureId, 'Staging demo');
   // Reserve the demo Homestead's number (the sequence never reaches it), then
   // let the real open path fill in its buildings and move the Creature in.
   await pool.query(
@@ -674,11 +693,8 @@ const STAGING_DEMO_CONTEST_ID = 900001;
 async function seedStagingContest() {
   const ids = [];
   for (const p of STAGING_CONTEST_WALLETS) {
-    const minted = await genesis.mint(pool, p.wallet, p.user);
-    if (minted.seed && !minted.creature) {
-      const awakened = await genesis.awaken(pool, p.wallet, minted.seed.seedId);
-      if (awakened.created) await creatures.rename(pool, p.wallet, awakened.creature.creatureId, p.name);
-    }
+    const awakened = await stagingGenesis(p.wallet, p.user);
+    if (awakened) await creatures.rename(pool, p.wallet, awakened.creatureId, p.name);
     const owned = await creatures.listOwned(pool, p.wallet);
     if (!owned.length) return;
     ids.push(owned[0].creatureId);
@@ -689,12 +705,6 @@ async function seedStagingContest() {
   const [a, b] = STAGING_CONTEST_WALLETS;
   const sent = await contests.challenge(pool, a.wallet, a.user, { creatureId: ids[0], opponent: b.wallet }, at);
   await contests.accept(pool, b.wallet, b.user, sent.challenge.challengeId, ids[1], at, { contestId: STAGING_DEMO_CONTEST_ID });
-}
-async function awakenDemo(seedId) {
-  const awakened = await genesis.awaken(pool, STAGING_DEMO_WALLET, seedId);
-  if (awakened.created) {
-    await creatures.rename(pool, STAGING_DEMO_WALLET, awakened.creature.creatureId, 'Staging demo');
-  }
 }
 
 async function start() {

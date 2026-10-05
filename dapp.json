@@ -9,11 +9,11 @@
   },
   "tests": [
     {
-      "id": "home.supply",
-      "name": "Home shows the tagline and the live Creature supply",
+      "id": "home.creature-count",
+      "name": "Home shows the tagline and the wallet's Creature count out of 10",
       "path": "/",
-      "expectSelector": "#supply-count",
-      "expectText": "/ 5,000",
+      "expectSelector": "#creature-slots #creature-count",
+      "expectText": "/ 10",
       "visual": true,
       "impact": [
         "public/**",
@@ -32,6 +32,12 @@
       "path": "/",
       "expectSelector": "#genesis [data-action=\"genesis-mint\"]",
       "expectText": "GENESIS MINT"
+    },
+    {
+      "name": "Home's Genesis shows its cost in STEAD",
+      "path": "/",
+      "expectSelector": "#genesis [data-genesis-cost=\"5000\"]",
+      "expectText": "5,000 STEAD"
     },
     {
       "name": "Home shows the Daily Check-in seven day schedule",

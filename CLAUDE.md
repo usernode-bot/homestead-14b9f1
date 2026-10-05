@@ -87,13 +87,16 @@ crafting or trading, other STEAD spending and transactions do not exist yet,
 and none may be faked.
 
 - **Genesis:** `lib/genesis.js` holds every rule, enforced in Postgres
-  transactions: one Genesis per wallet (`genesis_wallets.genesis_used`, which
-  a trigger never lets go back to false), one dormant Seed per Genesis, one
-  Creature per Seed, and the single `creature_supply` counter whose new value
-  is the Creature's id (so ids are never reused and never pass the cap).
-  Nothing is on-chain: say "Genesis created", never "transaction confirmed".
-  A future transfer changes only `creatures.owner` / `seeds.owner`;
-  `created_by` and `genesis_wallet` keep the history. `npm test` runs its
+  transactions. Genesis is repeatable for `GENESIS_COST` STEAD each
+  (`debitStead`, type GENESIS), checked in order under a lock on the wallet:
+  room under the ownership cap, no Genesis Seed still waiting (one at a time,
+  a partial unique index), enough STEAD; then the Seed and its debit are
+  written together. One Creature per Seed; ids come from `creatures_id_seq`
+  (never reused). `genesis_wallets.genesis_used` (never back to false) means
+  "has used Genesis" and links the Homeroom user to the wallet; it gates
+  nothing. Nothing is on-chain: say "Genesis created", never "transaction
+  confirmed". A future transfer changes only `creatures.owner`, through
+  `lib/ownership.js`; `created_by` and `genesis_wallet` keep the history. `npm test` runs its
   tests against `DATABASE_URL` (a throwaway database: it drops the tables).
 
 - **Creatures:** everything a Creature is (name, Species, rarity, base stats,
@@ -166,12 +169,16 @@ and none may be faked.
   Every value and formula is in `public/js/contest-config.js`. The opponent
   is a wallet address, or a Homeroom username resolved through the platform
   directory to the wallet that user used Genesis with.
-- **Supply cap:** there can never be more than 5,000 Creatures.
-  `MAX_CREATURE_SUPPLY` in `public/js/config.js` is the only place that number
-  is written. The page reads it as `window.HOMESTEAD_CONFIG`, the server as
-  `require('./public/js/config')`. Every Creature creation system must check it.
+- **Ownership cap:** a wallet owns at most `MAX_OWNED_CREATURES` (10),
+  counted on the server from current ownership plus Seeds waiting to be
+  awakened. There is no global Creature cap and none may be added. Every
+  system that gives a wallet a Creature or Seed must go through
+  `lib/ownership.js` (`lockWallet` + `assertRoom`, or `transferCreature` for a
+  sale). `MAX_OWNED_CREATURES` and `GENESIS_COST` are written only in
+  `public/js/config.js` (page: `window.HOMESTEAD_CONFIG`, server:
+  `require('./public/js/config')`).
 - **Game state:** `public/js/state.js` is the one store (`HOMESTEAD_STORE`),
-  with a slot per future system (wallet, supply, creature, seed, homestead,
+  with a slot per future system (wallet, slots, creature, seed, homestead,
   resources, stead, gear, contests, marketplace, breeding). A new system
   fills its slot; screens read the store and re-render on `subscribe`.
 - **Wallet:** CONNECT WALLET reads the wallet linked to the signed-in Homeroom
@@ -198,9 +205,9 @@ and none may be faked.
   mohawk and one eye) in the wordmark, plus `collectible` panels with a dashed
   pink "stitch" and tilted pink `sticker` labels.
 - **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`, plus
-  `text-display` for the wordmark and the supply count only. Headings and nav
-  are heavy (`font-black`/`font-bold`); nav labels and the supply sticker are
-  uppercase by the owner's request.
+  `text-display` for the wordmark and the Creature count only. Headings and nav
+  are heavy (`font-black`/`font-bold`); nav labels are uppercase by the
+  owner's request.
 - **One fixed look:** dark. A collectible game drawn as its own scene; the owner
   asked for a dark UI. Tokens are set once on `:root`.
 

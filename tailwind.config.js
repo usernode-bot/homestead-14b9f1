@@ -63,7 +63,7 @@ module.exports = {
         body: ['1rem', { lineHeight: '1.5rem' }],
         heading: ['1.25rem', { lineHeight: '1.75rem', fontWeight: '600' }],
         title: ['1.75rem', { lineHeight: '2.25rem', fontWeight: '700' }],
-        // HOMESTEAD's wordmark and the supply count, and nothing else.
+        // HOMESTEAD's wordmark and the Creature count, and nothing else.
         display: ['3rem', { lineHeight: '1', fontWeight: '900', letterSpacing: '-0.03em' }],
       },
     },

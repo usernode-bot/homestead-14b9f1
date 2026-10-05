@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const hcfg = require('../public/js/homestead-config');
 const wcfg = require('../public/js/work-config');
 const genesis = require('../lib/genesis');
+const { fundAndMint } = require('./support');
 const creatures = require('../lib/creatures');
 const homestead = require('../lib/homestead');
 
@@ -29,13 +30,13 @@ test('Homesteads in Postgres', { skip: !url && 'DATABASE_URL is not set' }, asyn
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query('DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE');
+    await pool.query('DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, homestead_buildings, homesteads, creatures, seeds, genesis_wallets, stead_ledger, stead_accounts CASCADE');
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
     await homestead.ensureSchema(pool);
   }
   async function awakenFor(wallet) {
-    const m = await genesis.mint(pool, wallet, wallet);
+    const m = await fundAndMint(pool, wallet, wallet);
     return (await genesis.awaken(pool, wallet, m.seed.seedId)).creature;
   }
   async function count(table) {
@@ -45,7 +46,7 @@ test('Homesteads in Postgres', { skip: !url && 'DATABASE_URL is not set' }, asyn
   await t.test('no Creature: nothing is created', async () => {
     await reset();
     assert.deepStrictEqual(await homestead.open(pool, 'ut1alice'), { created: false, homestead: null, creature: null });
-    await genesis.mint(pool, 'ut1alice', 'alice'); // a dormant Seed is not a Creature
+    await fundAndMint(pool, 'ut1alice', 'alice'); // a dormant Seed is not a Creature
     assert.strictEqual((await homestead.open(pool, 'ut1alice')).homestead, null);
     assert.strictEqual(await count('homesteads'), 0);
   });

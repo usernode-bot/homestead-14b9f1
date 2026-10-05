@@ -7,6 +7,7 @@ const assert = require('node:assert');
 const { Pool } = require('pg');
 const cfg = require('../public/js/contest-config');
 const genesis = require('../lib/genesis');
+const { fundAndMint } = require('./support');
 const creatures = require('../lib/creatures');
 const homestead = require('../lib/homestead');
 const work = require('../lib/work');
@@ -72,7 +73,7 @@ test('Contests in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async 
   async function reset() {
     await pool.query(`DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items,
       creature_care_log, stead_ledger, stead_accounts, creature_work, homestead_buildings, homesteads, creatures, seeds,
-      genesis_wallets, creature_supply CASCADE`);
+      genesis_wallets CASCADE`);
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
     await work.ensureSchema(pool);
@@ -82,7 +83,7 @@ test('Contests in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async 
     await contests.ensureSchema(pool); // idempotent
   }
   async function creatureFor(wallet) {
-    const m = await genesis.mint(pool, wallet, 'user-' + wallet);
+    const m = await fundAndMint(pool, wallet, 'user-' + wallet);
     return (await genesis.awaken(pool, wallet, m.seed.seedId)).creature;
   }
   async function identity(id) {

@@ -5,7 +5,7 @@
 // (require('./public/js/creature-config')). The server's generator
 // (lib/creature-generator.js) rolls a Creature from these tables exactly once,
 // at Awaken; the page only looks values up here to label and draw them.
-// Rebalance here, never in a screen. The supply cap stays in config.js.
+// Rebalance here, never in a screen.
 //
 // Stored values are the `id`s below. Never rename an id once Creatures carry
 // it: change the `label` instead.

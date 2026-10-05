@@ -9,6 +9,7 @@ const ccfg = require('../public/js/creature-config');
 const hcfg = require('../public/js/homestead-config');
 const wcfg = require('../public/js/work-config');
 const genesis = require('../lib/genesis');
+const { fundAndMint } = require('./support');
 const creatures = require('../lib/creatures');
 const homestead = require('../lib/homestead');
 const work = require('../lib/work');
@@ -56,7 +57,7 @@ test('Work in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query('DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creature_work, homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE');
+    await pool.query('DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creature_work, homestead_buildings, homesteads, creatures, seeds, genesis_wallets, stead_ledger, stead_accounts CASCADE');
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
     await work.ensureSchema(pool);
@@ -65,7 +66,7 @@ test('Work in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
   }
   // A wallet with a Creature of the given Trade, living in its open Homestead.
   async function homeWith(wallet, trade) {
-    const m = await genesis.mint(pool, wallet, wallet);
+    const m = await fundAndMint(pool, wallet, wallet);
     const c = (await genesis.awaken(pool, wallet, m.seed.seedId)).creature;
     // Trade is rolled at Awaken and permanent; the test sets it past the
     // identity trigger only to pick which Trade it exercises.
