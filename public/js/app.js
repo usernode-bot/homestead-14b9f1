@@ -14,9 +14,9 @@
   var walletEl = document.getElementById('wallet');
   var viewEl = document.getElementById('view');
 
-  // A Creature by id, /creature/<id>, belongs under MY CREATURE in the nav.
+  // A Creature by id, /creature/<id>: the player's own sit under MY HOMESTEAD.
   var CREATURE_PATH = /^\/creature\/(\d{1,9})$/;
-  // A Homestead by its number, /homestead/<id>, belongs under HOMESTEAD.
+  // A Homestead by its number, /homestead/<id>, sits under MY HOMESTEAD.
   var HOMESTEAD_PATH = /^\/homestead\/(\d{1,9})$/;
   // A Contest by its number, /contests/<id>, belongs under CONTESTS.
   var CONTEST_PATH = /^\/contests\/(\d{1,9})$/;
@@ -44,14 +44,22 @@
     return screens.ROUTES.find(function (r) { return r.path === path; }) || screens.ROUTES[0];
   }
 
+  // MY HOMESTEAD is current on its tabs, the Gear inventory, a Homestead by
+  // number and the player's own Creatures.
+  function inMyHomestead(route) {
+    return route.group === 'mine' || route.key === 'gear' || route.key === 'homesteadById' ||
+      (route.key === 'creatureById' && store.get().viewedCreature.ownedByYou);
+  }
+
   function renderNav(route) {
     // Challenges waiting for this player show as a count on CONTESTS.
     var c = store.get().contests;
     var waiting = store.get().wallet.status === 'connected' && c.status === 'ready' ? c.incoming.length : 0;
-    navEl.innerHTML = screens.ROUTES.filter(function (r) { return !r.header; }).map(function (r) {
-      return '<li><a href="' + r.path + '" data-nav class="nav-tab"' +
-        (r === route || (r === route.nav && (route.homesteadId || route.contestId || route.key === 'gear' || store.get().viewedCreature.ownedByYou)) ? ' aria-current="page"' : '') + '>' +
-        screens.icon(r.key, 'h-4 w-4') + r.label +
+    navEl.innerHTML = screens.NAV.map(function (r) {
+      var current = r.key === 'mine' ? inMyHomestead(route) : r === route || (r === route.nav && route.contestId);
+      return '<li><a href="' + r.path + '" data-nav class="nav-tab"' + (r.key === 'mine' ? ' data-nav-mine' : '') +
+        (current ? ' aria-current="page"' : '') + '>' +
+        screens.icon(r.icon || r.key, 'h-4 w-4') + r.label +
         (r.key === 'contests' && waiting
           ? '<span class="rounded-full bg-punk px-1.5 text-small font-black tabular-nums text-ground" data-contest-badge="' + waiting + '">' + waiting + '<span class="sr-only"> ' + (waiting === 1 ? 'challenge' : 'challenges') + ' waiting</span></span>'
           : '') +
@@ -154,7 +162,8 @@
     if (route.key === 'contests') contests.ensure();
     if (route.contestId) contests.view(route.contestId);
     var state = store.get();
-    document.title = route.label === 'HOME' || route.label === 'HOMESTEAD' ? 'HOMESTEAD' : route.label + ' · HOMESTEAD';
+    var title = route.title || route.label;
+    document.title = title === 'HOME' || title === 'HOMESTEAD' ? 'HOMESTEAD' : title + ' · HOMESTEAD';
     renderNav(route);
     renderWallet(state, route);
     // A re-render (another player's move arriving) keeps the field being typed in.
