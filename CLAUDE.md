@@ -189,8 +189,12 @@ and none may be faked.
 - **Screens:** `public/js/screens.js` (one render function per route),
   `public/js/app.js` (router, nav, wallet area). Routes are clean paths
   (`/`, `/creature`, `/homestead`, `/contests`, `/marketplace`, `/collection`,
-  `/profile`, `/gear` under HOMESTEAD, `/contests/<id>` under CONTESTS);
-  the server's catch-all serves `index.html` for each.
+  `/profile`, `/contests/<id>` under CONTESTS); the server's catch-all serves
+  `index.html` for each. The top menu (`NAV` in screens.js) is HOME, MY
+  HOMESTEAD, CONTESTS, MARKETPLACE: MY HOMESTEAD's page carries the tabs
+  CREATURE (`/creature`), HOMESTEAD (`/homestead`) and COLLECTION
+  (`/collection`), and also holds `/gear`, `/homestead/<id>` and the player's
+  own `/creature/<id>`.
 - **Content rules:** Homeroom apps may not include combat or fantasy violence,
   so head-to-head play is called "compete"/"contests", not battles. Design it
   as non-violent contests (races, talent shows, puzzles), and keep any Genesis

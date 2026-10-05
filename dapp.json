@@ -130,6 +130,31 @@
       "expectText": "Your collection is empty."
     },
     {
+      "id": "nav.my-homestead",
+      "name": "MY HOMESTEAD in the menu holds the Creature, Homestead and Collection tabs, with COLLECTION current on /collection",
+      "path": "/collection",
+      "expectSelector": "[data-mine-tabs] [data-mine-tab=\"collection\"][aria-current=\"page\"]",
+      "expectText": "COLLECTION",
+      "visual": true,
+      "impact": [
+        "public/js/app.js",
+        "public/js/screens.js",
+        "styles/**"
+      ]
+    },
+    {
+      "name": "The Gear inventory sits under MY HOMESTEAD's HOMESTEAD tab",
+      "path": "/gear",
+      "expectSelector": "[data-mine-tabs] [data-mine-tab=\"homestead\"][aria-current=\"page\"]",
+      "expectText": "HOMESTEAD"
+    },
+    {
+      "name": "The menu shows MY HOMESTEAD as current on /creature",
+      "path": "/creature",
+      "expectSelector": "#nav [data-nav-mine][aria-current=\"page\"]",
+      "expectText": "MY HOMESTEAD"
+    },
+    {
       "id": "creature.profile",
       "name": "A Creature's profile shows its name, Gene, stats and Creature ID",
       "path": "/creature/1",

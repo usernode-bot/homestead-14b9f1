@@ -28,16 +28,27 @@
     return '<svg class="' + (cls || 'h-5 w-5') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
   }
 
-  // The screens, in navigation order. PROFILE is reached from the header's
-  // player button instead of a tab (header: true).
+  // The screens. PROFILE is reached from the header's player button instead
+  // of a tab (header: true). The 'mine' group are the tabs of MY HOMESTEAD, in
+  // tab order; title is the browser title when it differs from the label.
   var ROUTES = [
     { path: '/', key: 'home', label: 'HOME' },
-    { path: '/creature', key: 'creature', label: 'MY CREATURE' },
-    { path: '/homestead', key: 'homestead', label: 'HOMESTEAD' },
+    { path: '/creature', key: 'creature', label: 'CREATURE', title: 'MY CREATURE', group: 'mine' },
+    { path: '/homestead', key: 'homestead', label: 'HOMESTEAD', group: 'mine' },
+    { path: '/collection', key: 'collection', label: 'COLLECTION', group: 'mine' },
     { path: '/contests', key: 'contests', label: 'CONTESTS' },
     { path: '/marketplace', key: 'marketplace', label: 'MARKETPLACE' },
-    { path: '/collection', key: 'collection', label: 'COLLECTION' },
     { path: '/profile', key: 'profile', label: 'PROFILE', header: true },
+  ];
+  function routeByKey(key) { return ROUTES.find(function (r) { return r.key === key; }); }
+  var MINE_TABS = ROUTES.filter(function (r) { return r.group === 'mine'; });
+
+  // The top menu, in order. MY HOMESTEAD opens its first tab.
+  var NAV = [
+    routeByKey('home'),
+    { path: MINE_TABS[0].path, key: 'mine', label: 'MY HOMESTEAD', icon: 'homestead' },
+    routeByKey('contests'),
+    routeByKey('marketplace'),
   ];
 
   function pageHeading(route) {
@@ -46,9 +57,28 @@
       route.label + '</h1>';
   }
 
+  // MY HOMESTEAD's heading, with its CREATURE / HOMESTEAD / COLLECTION tabs;
+  // activeKey is the tab showing.
+  function myHomesteadHeading(activeKey) {
+    return '<h1 class="mb-3 flex items-center gap-3 text-title font-black tracking-tight">' +
+        '<span class="flex h-10 w-10 items-center justify-center rounded-xl bg-raised text-punk">' + icon('homestead') + '</span>' +
+        'MY HOMESTEAD</h1>' +
+      '<nav aria-label="My Homestead" class="-mx-1 mb-6 overflow-x-auto px-1 py-1">' +
+        '<ul class="flex gap-1" data-mine-tabs>' +
+          MINE_TABS.map(function (r) {
+            return '<li><a href="' + r.path + '" data-nav class="nav-tab" data-mine-tab="' + r.key + '"' + (r.key === activeKey ? ' aria-current="page"' : '') + '>' + r.label + '</a></li>';
+          }).join('') +
+        '</ul>' +
+      '</nav>';
+  }
+  // The heading a screen starts with: MY HOMESTEAD's tabs for its own tabs.
+  function screenHeading(route) {
+    return route.group === 'mine' ? myHomesteadHeading(route.key) : pageHeading(route);
+  }
+
   // The empty state every unbuilt screen shows: a framed, dashed placeholder.
   function placeholder(route, title, detail) {
-    return pageHeading(route) +
+    return screenHeading(route) +
       '<section class="collectible state-empty py-14" data-empty="' + route.key + '">' +
         '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon(route.key, 'h-8 w-8') + '</span>' +
         '<p class="text-heading">' + title + '</p>' +
@@ -406,9 +436,9 @@
       // until then it shows with those controls waiting.
       var v = state.viewedCreature;
       if (v.id === c.creatureId && v.status === 'ready' && v.creature) {
-        return pageHeading(route) + cards.profile(v.creature, profileOpts(state, v, v.ownedByYou));
+        return screenHeading(route) + cards.profile(v.creature, profileOpts(state, v, v.ownedByYou));
       }
-      return pageHeading(route) + cards.profile(c, { canRename: true, canAct: true, controls: null, gear: state.gear });
+      return screenHeading(route) + cards.profile(c, { canRename: true, canAct: true, controls: null, gear: state.gear });
     }
     var hasSeed = state.wallet.status === 'connected' && state.seed && !c;
     return placeholder(route, 'No Creature yet.', hasSeed
@@ -431,7 +461,7 @@
   function homestead(state, route) {
     var w = state.wallet;
     if (w.status === 'disconnected') {
-      return pageHeading(route) +
+      return screenHeading(route) +
         '<section class="collectible state-empty max-w-3xl py-14" data-empty="homestead">' +
           '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon('homestead', 'h-8 w-8') + '</span>' +
           '<p class="text-heading font-black">CONNECT HOMEROOM WALLET</p>' +
@@ -441,16 +471,16 @@
     }
     var h = state.homestead;
     if (w.status === 'connected' && (state.genesis.status === 'error' || h.status === 'error')) {
-      return pageHeading(route) +
+      return screenHeading(route) +
         '<section class="collectible state-error max-w-3xl">' +
           '<p class="text-heading">Couldn\'t load your Homestead.</p>' +
           '<p class="max-w-sm text-body text-muted">Your Creature is safe. Check your connection and try again.</p>' +
           '<button type="button" class="btn-secondary mt-2" data-action="homestead-retry">Retry</button>' +
         '</section>';
     }
-    if (w.status !== 'connected' || h.status !== 'ready') return pageHeading(route) + homesteadLoading();
+    if (w.status !== 'connected' || h.status !== 'ready') return screenHeading(route) + homesteadLoading();
     if (!h.homestead || !h.creature) {
-      return pageHeading(route) +
+      return screenHeading(route) +
         '<section class="collectible state-empty max-w-3xl py-14" data-empty="homestead-waiting">' +
           '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon('homestead', 'h-8 w-8') + '</span>' +
           '<p class="text-heading font-black">YOUR HOMESTEAD IS WAITING</p>' +
@@ -458,7 +488,7 @@
           '<a href="/" data-nav class="btn-secondary mt-2">Go to Genesis</a>' +
         '</section>';
     }
-    return pageHeading(route) + homesteadView.page(h.homestead, h.creature, {
+    return screenHeading(route) + homesteadView.page(h.homestead, h.creature, {
       work: h.work, canAct: true, pending: h.pending, error: h.error, scope: 'own', clockOffset: h.clockOffset,
     }) +
       '<section class="mt-8 max-w-3xl">' +
@@ -473,7 +503,9 @@
   // The Gear inventory, /gear: this wallet's Gear, equipped or not. EQUIP puts
   // Gear on the wallet's own Creature.
   function gear(state, route) {
-    var heading = pageHeading(route);
+    // Opened from the Homestead, so it sits under MY HOMESTEAD's HOMESTEAD tab.
+    var heading = myHomesteadHeading('homestead') +
+      '<h2 class="mb-4 flex items-center gap-2 text-heading font-black">' + icon('gear', 'h-5 w-5 text-punk') + route.label + '</h2>';
     if (state.wallet.status !== 'connected') {
       return heading +
         '<section class="collectible state-empty max-w-3xl py-14" data-empty="gear">' +
@@ -527,7 +559,11 @@
   function creatureById(state, route) {
     var v = state.viewedCreature;
     var mine = v.status === 'ready' && v.ownedByYou && state.wallet.status === 'connected';
-    var heading = pageHeading(mine ? route : { key: 'creature', label: 'CREATURE' });
+    // The player's own Creatures sit under MY HOMESTEAD: the CREATURE tab for
+    // the one it shows, COLLECTION for the rest.
+    var heading = mine
+      ? myHomesteadHeading(state.creature && state.creature.creatureId === v.creature.creatureId ? 'creature' : 'collection')
+      : pageHeading({ key: 'creature', label: 'CREATURE' });
     if (v.status === 'ready' && v.creature) return heading + cards.profile(v.creature, profileOpts(state, v, mine));
     if (v.status === 'missing') {
       return heading +
@@ -569,7 +605,7 @@
     }
     var col = state.collection;
     if (col.status === 'error') {
-      return pageHeading(route) +
+      return screenHeading(route) +
         '<section class="collectible state-error">' +
           '<p class="text-heading">Couldn\'t load your collection.</p>' +
           '<p class="max-w-sm text-body text-muted">Your Creatures are safe. Check your connection and try again.</p>' +
@@ -577,14 +613,14 @@
         '</section>';
     }
     if (col.status !== 'ready') {
-      return pageHeading(route) +
+      return screenHeading(route) +
         '<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" aria-busy="true"><span class="sr-only">Loading your collection</span>' +
           '<div class="collectible"><div class="skeleton aspect-square w-full rounded-2xl"></div><div class="skeleton mt-3 h-6 w-24"></div><div class="skeleton mt-2 h-5 w-16"></div></div>' +
           '<div class="collectible"><div class="skeleton aspect-square w-full rounded-2xl"></div><div class="skeleton mt-3 h-6 w-24"></div><div class="skeleton mt-2 h-5 w-16"></div></div>' +
         '</div>';
     }
     if (!col.creatures.length) {
-      return pageHeading(route) +
+      return screenHeading(route) +
         '<section class="collectible state-empty py-14" data-empty="collection">' +
           '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon('collection', 'h-8 w-8') + '</span>' +
           '<p class="text-heading">Your collection is empty.</p>' +
@@ -592,7 +628,7 @@
           '<a href="/" data-nav class="btn-secondary mt-2">Go to Genesis</a>' +
         '</section>';
     }
-    return pageHeading(route) +
+    return screenHeading(route) +
       collectionCount(state) +
       '<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" data-collection>' +
         col.creatures.map(function (c) { return cards.card(c, { href: '/creature/' + Number(c.creatureId) }); }).join('') +
@@ -638,6 +674,7 @@
 
   window.HOMESTEAD_SCREENS = {
     ROUTES: ROUTES,
+    NAV: NAV,
     icon: icon,
     render: { home: home, gear: gear, contests: contests, contestById: contestById, creature: creature, creatureById: creatureById, homestead: homestead, homesteadById: homesteadById, marketplace: marketplace, collection: collection, profile: profile },
   };
