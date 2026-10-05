@@ -19,9 +19,9 @@ test('STEAD config', () => {
   assert.strictEqual(cfg.addDays('2026-03-01', -1), '2026-02-28');
   assert.strictEqual(cfg.formatSigned(1240), '+1,240');
   assert.strictEqual(cfg.formatSigned(-50), '-50');
-  // Only Daily Check-in is live; the rest are reserved, spending types.
+  // Daily Check-in and Training are live; the rest are reserved, spending types.
   const active = Object.keys(cfg.TYPES).filter((k) => cfg.TYPES[k].active);
-  assert.deepStrictEqual(active, ['DAILY_CHECKIN']);
+  assert.deepStrictEqual(active, ['DAILY_CHECKIN', 'TRAINING']);
   for (const k of ['TRAINING', 'FEEDING', 'GEAR', 'UPGRADE', 'MARKETPLACE_FEE', 'BREEDING']) {
     assert.strictEqual(cfg.TYPES[k].direction, 'debit', k);
   }
@@ -143,8 +143,8 @@ test('STEAD in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t)
   await t.test('only active types are recorded, credits only add and debits never go below 0', async () => {
     await assert.rejects(stead.creditStead(pool, A, 0, 'DAILY_CHECKIN'), { code: 'bad_amount' });
     await assert.rejects(stead.creditStead(pool, A, 10, 'NOT_A_TYPE'), { code: 'unknown_type' });
-    // Spending systems are reserved, not live.
-    await assert.rejects(stead.debitStead(pool, A, 50, 'TRAINING'), { code: 'unknown_type' });
+    // Spending systems other than Training are reserved, not live.
+    await assert.rejects(stead.debitStead(pool, A, 50, 'GEAR'), { code: 'unknown_type' });
     await assert.rejects(stead.debitStead(pool, A, 50, 'DAILY_CHECKIN'), { code: 'wrong_direction' });
     // The same key for the same wallet and type is recorded once.
     await assert.rejects(stead.creditStead(pool, A, 10, 'DAILY_CHECKIN', {}, { key: '2026-10-05' }), { code: 'duplicate_entry' });

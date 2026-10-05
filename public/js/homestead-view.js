@@ -236,6 +236,8 @@
           '<p class="text-body"><span class="font-black">IDLE.</span> ' +
             (opts.canAct ? 'Choose how long to work. ' : 'Not working right now. ') +
             '<span class="text-muted">Brings home ' + makesText + '.</span></p>' +
+          (c.care ? '<p class="text-small text-muted" data-work-output>' + c.care.hungerLabel + ': ' + Math.round(c.care.workEfficiency * 100) + '% output.' +
+            (c.care.workEfficiency < 1 ? ' Feed it on its profile to bring home more.' : '') + '</p>' : '') +
           (opts.canAct
             ? '<div class="grid grid-cols-3 gap-2" role="group" aria-label="How long to work">' + wcfg.DURATIONS.map(function (d) {
                 return '<button type="button" class="btn-secondary px-2" data-action="work-start" data-duration="' + d.id + '" data-building="' + buildingId + '" data-creature-id="' + Number(c.creatureId) + '"' +
@@ -261,6 +263,7 @@
             '<div><dt class="text-muted">Time remaining</dt><dd class="font-bold tabular-nums" data-work-remaining>' +
               wcfg.formatSpan(Date.parse(w.endsAt) - now) + '</dd></div>' +
           '</dl>' +
+          (w.efficiency < 1 ? '<p class="text-small text-muted" data-work-output>Set off ' + (w.hungerState === 'STARVING' ? 'starving' : 'hungry') + ': ' + Math.round(w.efficiency * 100) + '% output.</p>' : '') +
         '</li>';
     } else {
       status = 'completed';
@@ -269,7 +272,7 @@
           '<p class="text-heading font-black">WORK COMPLETE</p>' +
           '<p class="text-body">' + cards.nameSpan(c) + ' finished ' + (t ? t.done : 'working') + '.</p>' +
           (w.rewards
-            ? amounts(w.rewards)
+            ? amounts(w.rewards) + (w.efficiency < 1 ? '<p class="text-small text-muted">' + Math.round(w.efficiency * 100) + '% output: it set off ' + (w.hungerState === 'STARVING' ? 'starving' : 'hungry') + '.</p>' : '')
             : '<p class="text-small text-muted">The rewards are counted when the owner next opens this Homestead.</p>') +
           (opts.canAct && w.rewards
             ? '<button type="button" class="btn-primary self-start" data-action="work-collect" data-work-id="' + Number(w.workId) + '"' + (busy ? ' disabled' : '') + '>' +

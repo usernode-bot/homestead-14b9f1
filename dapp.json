@@ -135,7 +135,9 @@
         "public/js/creatures.js",
         "public/js/screens.js",
         "lib/creature*.js",
-        "styles/**"
+        "styles/**",
+        "public/js/care-config.js",
+        "lib/care.js"
       ]
     },
     {
@@ -143,6 +145,18 @@
       "path": "/creature/1",
       "expectSelector": "[data-creature-profile] [data-stat=\"luck\"]",
       "expectText": "Personality"
+    },
+    {
+      "name": "A Creature's profile shows its hunger and condition",
+      "path": "/creature/1",
+      "expectSelector": "[data-creature-profile] [data-hunger-section] [data-condition]",
+      "expectText": "HUNGER"
+    },
+    {
+      "name": "A Creature's profile shows base, training and effective stats",
+      "path": "/creature/1",
+      "expectSelector": "[data-creature-profile] [data-training] [data-effective-stat=\"attack\"]",
+      "expectText": "Effective"
     },
     {
       "name": "An unknown Creature ID shows not found",

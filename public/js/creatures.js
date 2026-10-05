@@ -1,5 +1,5 @@
 // HOMESTEAD Creatures, in the page: the wallet's collection, the Creature
-// open at /creature/<id>, and renaming.
+// open at /creature/<id>, renaming, and Feeding + Training (lib/care.js).
 //
 // Everything shown comes from the server, which generated it once at Awaken
 // and stored it. Nothing here rolls or invents a Creature.
@@ -30,11 +30,14 @@
   }
 
   // Load the Creature at /creature/<id>, unless it is already showing.
-  async function view(id, force) {
+  // quiet: reload what is showing without the loading screen.
+  async function view(id, force, quiet) {
     var v = store.get().viewedCreature;
     if (!force && v.id === id && v.status !== 'error') return;
     var seq = ++viewSeq;
-    store.update('viewedCreature', { status: 'loading', id: id, creature: null, ownedByYou: false });
+    if (!quiet || v.id !== id) {
+      store.update('viewedCreature', { status: 'loading', id: id, creature: null, ownedByYou: false, controls: null, pending: null, notice: null, error: null });
+    }
     try {
       var res = await wallet.api('/api/creatures/' + id);
       if (seq !== viewSeq) return;
@@ -50,11 +53,76 @@
         store.update('viewedCreature', { status: 'missing' });
         return;
       }
-      store.update('viewedCreature', { status: 'ready', creature: data.creature, ownedByYou: data.ownedByYou });
+      store.update('viewedCreature', { status: 'ready', creature: data.creature, ownedByYou: data.ownedByYou, controls: data.controls || null });
     } catch (err) {
       if (seq !== viewSeq) return;
-      store.update('viewedCreature', { status: 'error' });
+      if (!quiet) store.update('viewedCreature', { status: 'error' });
     }
+  }
+
+  // ── Feeding + Training ────────────────────────────────────────────────────
+  // One request at a time (the buttons are disabled meanwhile). Each tap gets
+  // its own requestId; a request that never got an answer is sent once more
+  // with the SAME id, so the server applies it at most once. The server
+  // answers with the Creature and the owner's controls as they now are.
+  function newRequestId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'r' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  }
+
+  async function careRequest(kind, path, body, noticeFor) {
+    var v = store.get().viewedCreature;
+    if (v.status !== 'ready' || !v.ownedByYou || v.pending) return;
+    var id = v.id;
+    body = Object.assign({ requestId: newRequestId() }, body);
+    store.update('viewedCreature', { pending: kind, notice: null, error: null });
+    var res = null;
+    for (var attempt = 0; attempt < 2 && !res; attempt++) {
+      try {
+        res = await wallet.api(path, { method: 'POST', body: body });
+      } catch (err) {
+        res = null; // no answer: try once more with the same requestId
+      }
+    }
+    if (store.get().viewedCreature.id !== id) return;
+    if (!res) {
+      store.update('viewedCreature', { pending: null, error: 'Couldn\'t reach HOMESTEAD. Check your connection and try again.' });
+      view(id, true, true);
+      return;
+    }
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      store.update('viewedCreature', { pending: null, error: data.message || 'That didn\'t work. Try again.' });
+      view(id, true, true); // show what changed (another tab, Work started)
+      return;
+    }
+    store.update('viewedCreature', { pending: null, controls: data.controls, notice: noticeFor(data) });
+    replace(data.creature);
+    afterCare(kind);
+  }
+
+  // What else a Feed or Train changed: storage (Fodder) or the STEAD balance.
+  function afterCare(kind) {
+    if (kind === 'feed') {
+      // The Homestead reloads its storage next time it is opened.
+      if (store.get().homestead.status === 'ready') store.update('homestead', { key: null });
+    } else if (window.HOMESTEAD_STEAD) {
+      window.HOMESTEAD_STEAD.load();
+    }
+  }
+
+  function feed() {
+    var v = store.get().viewedCreature;
+    return careRequest('feed', '/api/creatures/' + Number(v.id) + '/feed', {}, function (data) {
+      return { kind: 'fed', restored: data.fed.restored, fodderSpent: data.fed.fodderSpent };
+    });
+  }
+
+  function train(stat) {
+    var v = store.get().viewedCreature;
+    return careRequest('train:' + stat, '/api/creatures/' + Number(v.id) + '/train', { stat: stat }, function (data) {
+      return { kind: 'trained', stat: data.trained.stat, amount: data.trained.amount, cost: data.trained.cost };
+    });
   }
 
   // Put a Creature the server returned everywhere it shows.
@@ -153,5 +221,5 @@
     if (v.id != null) view(v.id, true); // whether you own it may have changed
   });
 
-  window.HOMESTEAD_CREATURES = { loadCollection: loadCollection, view: view, openRename: openRename };
+  window.HOMESTEAD_CREATURES = { loadCollection: loadCollection, view: view, openRename: openRename, feed: feed, train: train };
 })();
