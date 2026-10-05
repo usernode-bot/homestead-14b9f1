@@ -14,7 +14,7 @@ test('Genesis, Seed and Awaken', { skip: !url && 'DATABASE_URL is not set' }, as
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query('DROP TABLE IF EXISTS creatures, seeds, genesis_wallets, creature_supply CASCADE');
+    await pool.query('DROP TABLE IF EXISTS gear_starter_claims, gear_items, creatures, seeds, genesis_wallets, creature_supply CASCADE');
     await genesis.ensureSchema(pool);
     await genesis.ensureSchema(pool); // boot twice: idempotent
   }

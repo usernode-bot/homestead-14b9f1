@@ -75,7 +75,19 @@
         notice: null, // 'claimed' after a claim succeeds
         error: null, // what the last claim could not do
       },
-      gear: [],
+      // This wallet's Gear inventory (gear.js, lib/gear.js inventory shape):
+      // every item it owns, equipped or not. The Gear a Creature has on comes
+      // with the Creature (creature.gear).
+      gear: {
+        status: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
+        walletId: null,
+        items: [],
+        starterClaimed: false,
+        choosing: null, // { creatureId, slot } while picking Gear for a slot
+        pending: null, // 'claim' | 'equip:<gearId>' | 'unequip:<slot>' while a request is in flight
+        notice: null, // what the last claim, equip or unequip did: { kind, ... }
+        error: null, // what the last one could not do
+      },
       contests: null, // head-to-head play (see CLAUDE.md content rules)
       marketplace: { listings: [] },
       breeding: null,

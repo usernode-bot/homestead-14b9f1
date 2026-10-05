@@ -56,7 +56,7 @@ test('Work in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query('DROP TABLE IF EXISTS creature_work, homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE');
+    await pool.query('DROP TABLE IF EXISTS gear_starter_claims, gear_items, creature_work, homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE');
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
     await work.ensureSchema(pool);

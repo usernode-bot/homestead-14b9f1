@@ -8,6 +8,7 @@ const homestead = require('./lib/homestead');
 const work = require('./lib/work');
 const stead = require('./lib/stead');
 const care = require('./lib/care');
+const gear = require('./lib/gear');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -187,7 +188,7 @@ function genesisWallet(req) {
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError || err instanceof gear.GearError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -293,6 +294,65 @@ app.post('/api/creatures/:id/train', async (req, res) => {
   const body = req.body || {};
   try {
     res.json(await care.train(pool, wallet, id, String(body.stat || ''), body.requestId, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// Gear (lib/gear.js). The inventory and every change are for the wallet the
+// platform's verified token links to this account. Equip and unequip are one
+// transaction each and free (no STEAD); they answer with the Creature as it
+// now is and the whole inventory, so the page shows one truth. Repeating one
+// (double tap, another tab) changes nothing a second time.
+app.get('/api/gear', async (req, res) => {
+  try {
+    res.json(await gear.inventory(pool, genesisWallet(req)));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// The starter kit, once per wallet, ever.
+app.post('/api/gear/claim-starter', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  try {
+    res.json(await gear.claimStarter(pool, wallet));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/creatures/:id/gear/equip', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const id = creatureIdParam(req);
+  if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+  const body = req.body || {};
+  try {
+    const result = await gear.equip(pool, wallet, id, Number(body.gearId), String(body.slot || ''));
+    res.json({
+      creature: await creatures.getById(pool, id, req.now),
+      gear: await gear.inventory(pool, wallet),
+      result,
+    });
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/creatures/:id/gear/unequip', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const id = creatureIdParam(req);
+  if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+  try {
+    const result = await gear.unequip(pool, wallet, id, String((req.body && req.body.slot) || ''));
+    res.json({
+      creature: await creatures.getById(pool, id, req.now),
+      gear: await gear.inventory(pool, wallet),
+      result,
+    });
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -505,6 +565,14 @@ async function seedStaging() {
     if (!any.rows.length) {
       await work.start(pool, STAGING_DEMO_WALLET, { creatureId: opened.creature.creatureId, durationId: '4h' },
         new Date(Date.now() - 3600 * 1000));
+    }
+    // Give the demo wallet its starter Gear and put a Tool and an Accessory
+    // on the demo Creature, through the real paths, the first time only.
+    const claimed = await gear.claimStarter(pool, STAGING_DEMO_WALLET);
+    if (!claimed.alreadyClaimed) {
+      const pick = (catalogId) => claimed.granted.find((g) => g.catalogId === catalogId);
+      await gear.equip(pool, STAGING_DEMO_WALLET, opened.creature.creatureId, pick('moon-hammer').gearId, 'tool');
+      await gear.equip(pool, STAGING_DEMO_WALLET, opened.creature.creatureId, pick('lucky-bone').gearId, 'accessory');
     }
   }
 }

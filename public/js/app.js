@@ -7,6 +7,7 @@
   var creatures = window.HOMESTEAD_CREATURES;
   var homesteads = window.HOMESTEAD_HOMESTEADS;
   var stead = window.HOMESTEAD_STEAD;
+  var gear = window.HOMESTEAD_GEAR;
   var steadConfig = window.HOMESTEAD_STEAD_CONFIG;
   var navEl = document.getElementById('nav');
   var walletEl = document.getElementById('wallet');
@@ -31,13 +32,17 @@
       var home = screens.ROUTES.find(function (r) { return r.key === 'homestead'; });
       return { path: path, key: 'homesteadById', label: 'HOMESTEAD', nav: home, homesteadId: Number(hm[1]) };
     }
+    // The Gear inventory is opened from the Homestead, and sits under it.
+    if (path === '/gear') {
+      return { path: path, key: 'gear', label: 'GEAR', nav: screens.ROUTES.find(function (r) { return r.key === 'homestead'; }) };
+    }
     return screens.ROUTES.find(function (r) { return r.path === path; }) || screens.ROUTES[0];
   }
 
   function renderNav(route) {
     navEl.innerHTML = screens.ROUTES.map(function (r) {
       return '<li><a href="' + r.path + '" data-nav class="nav-tab"' +
-        (r === route || (r === route.nav && (route.homesteadId || store.get().viewedCreature.ownedByYou)) ? ' aria-current="page"' : '') + '>' +
+        (r === route || (r === route.nav && (route.homesteadId || route.key === 'gear' || store.get().viewedCreature.ownedByYou)) ? ' aria-current="page"' : '') + '>' +
         screens.icon(r.key, 'h-4 w-4') + r.label + '</a></li>';
     }).join('');
     var active = navEl.querySelector('[aria-current="page"]');
@@ -96,6 +101,7 @@
       'work-error': state.homestead.error || '',
       'stead-error': state.stead.error || '',
       'care-error': state.viewedCreature.error || '',
+      'gear-error': state.gear.error || '',
     };
     document.querySelectorAll('[data-field]').forEach(function (el) {
       el.textContent = values[el.dataset.field] || '';
@@ -143,6 +149,8 @@
     // Opens this wallet's Homestead (which re-renders) only when it isn't
     // already open for this wallet and Creature. Never during the render itself.
     if (route.key === 'homestead') homesteads.open();
+    // The Gear inventory, for the Gear screen and the owner's Gear picker.
+    if (route.key === 'gear' || route.creatureId || ownId) gear.ensure();
     var state = store.get();
     document.title = route.label === 'HOME' || route.label === 'HOMESTEAD' ? 'HOMESTEAD' : route.label + ' · HOMESTEAD';
     renderNav(route);
@@ -152,10 +160,17 @@
     fillFields(state);
   }
 
+  // A Gear message or open slot picker belongs to the screen it was made on.
+  function clearGearMessages() {
+    var g = store.get().gear;
+    if (g.notice || g.error || g.choosing) store.update('gear', { notice: null, error: null, choosing: null });
+  }
+
   function navigate(path) {
     // Keep the query (the Homeroom token, theme and preview parameters).
     history.pushState(null, '', path + window.location.search);
     walletMenuOpen = false;
+    clearGearMessages();
     refreshCreature();
     render();
     window.scrollTo(0, 0);
@@ -189,6 +204,12 @@
       else if (name === 'work-collect-pending') homesteads.collectPending();
       else if (name === 'feed') creatures.feed();
       else if (name === 'train') creatures.train(action.dataset.stat);
+      else if (name === 'gear-claim') gear.claim();
+      else if (name === 'gear-retry') gear.load();
+      else if (name === 'gear-choose') gear.choose(Number(action.dataset.creatureId), action.dataset.slot);
+      else if (name === 'gear-choose-cancel') gear.cancelChoose();
+      else if (name === 'gear-equip') gear.equip(Number(action.dataset.creatureId), Number(action.dataset.gearId), action.dataset.slot);
+      else if (name === 'gear-unequip') gear.unequip(Number(action.dataset.creatureId), action.dataset.slot);
       else if (name === 'rename') {
         var holder = action.closest('[data-creature-id]');
         creatures.openRename(holder && creatureFor(Number(holder.dataset.creatureId)));
@@ -204,7 +225,7 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && walletMenuOpen) { walletMenuOpen = false; render(); }
   });
-  window.addEventListener('popstate', function () { refreshCreature(); render(); });
+  window.addEventListener('popstate', function () { clearGearMessages(); refreshCreature(); render(); });
   store.subscribe(render);
 
   render();

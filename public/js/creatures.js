@@ -221,5 +221,5 @@
     if (v.id != null) view(v.id, true); // whether you own it may have changed
   });
 
-  window.HOMESTEAD_CREATURES = { loadCollection: loadCollection, view: view, openRename: openRename, feed: feed, train: train };
+  window.HOMESTEAD_CREATURES = { loadCollection: loadCollection, view: view, openRename: openRename, feed: feed, train: train, replace: replace };
 })();
