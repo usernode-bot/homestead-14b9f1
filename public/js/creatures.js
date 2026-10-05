@@ -45,6 +45,11 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var data = await res.json();
       if (seq !== viewSeq) return;
+      // The server answers an id nobody has with creature: null.
+      if (!data.creature) {
+        store.update('viewedCreature', { status: 'missing' });
+        return;
+      }
       store.update('viewedCreature', { status: 'ready', creature: data.creature, ownedByYou: data.ownedByYou });
     } catch (err) {
       if (seq !== viewSeq) return;

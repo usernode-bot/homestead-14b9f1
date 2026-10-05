@@ -78,6 +78,7 @@
       username: w.username ? '@' + w.username : '',
       error: w.error || '',
       'genesis-error': state.genesis.error || '',
+      'work-error': state.homestead.error || '',
     };
     document.querySelectorAll('[data-field]').forEach(function (el) {
       el.textContent = values[el.dataset.field] || '';
@@ -143,6 +144,9 @@
       else if (name === 'creature-retry') creatures.view(currentRoute().creatureId, true);
       else if (name === 'homestead-retry') { if (store.get().genesis.status === 'error') genesis.load(); else homesteads.open(true); }
       else if (name === 'homestead-view-retry') homesteads.view(currentRoute().homesteadId, true);
+      else if (name === 'work-start') homesteads.startWork(Number(action.dataset.creatureId), action.dataset.duration, action.dataset.building);
+      else if (name === 'work-collect') homesteads.collect(Number(action.dataset.workId));
+      else if (name === 'work-collect-pending') homesteads.collectPending();
       else if (name === 'rename') {
         var holder = action.closest('[data-creature-id]');
         creatures.openRename(holder && creatureFor(Number(holder.dataset.creatureId)));

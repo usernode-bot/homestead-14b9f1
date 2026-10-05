@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const genesis = require('./lib/genesis');
 const creatures = require('./lib/creatures');
 const homestead = require('./lib/homestead');
+const work = require('./lib/work');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -184,7 +185,7 @@ function genesisWallet(req) {
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -236,12 +237,15 @@ function creatureIdParam(req) {
   return Number.isInteger(id) && id >= 1 ? id : null;
 }
 
+// An id nobody has is answered 200 with creature: null (not 404), so opening
+// /creature/<unknown> shows "not found" without a failed request in the
+// console.
 app.get('/api/creatures/:id', async (req, res) => {
   const id = creatureIdParam(req);
-  if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+  if (!id) return res.json({ creature: null, ownedByYou: false });
   try {
     const creature = await creatures.getById(pool, id);
-    if (!creature) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
+    if (!creature) return res.json({ creature: null, ownedByYou: false });
     const wallet = genesisWallet(req);
     res.json({ creature, ownedByYou: !!wallet && creature.owner === wallet });
   } catch (err) {
@@ -265,24 +269,84 @@ app.post('/api/creatures/:id/name', async (req, res) => {
 // is created the first time that wallet owns a Creature, and the Creature in
 // it is always the one the wallet owns now (checked on the server, never
 // named by the browser). Anyone can look at a Homestead by its number.
+// This wallet's Homestead with its Work (lib/work.js). Opening it settles
+// Work whose time is up, rolling its rewards once.
+async function ownHomestead(wallet, now) {
+  const opened = await homestead.open(pool, wallet);
+  opened.work = opened.homestead
+    ? await work.overview(pool, opened.homestead.homesteadId, now, { settle: true })
+    : null;
+  return opened;
+}
+
 app.post('/api/homestead', async (req, res) => {
   const wallet = genesisWallet(req);
   if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
   try {
-    res.json(await homestead.open(pool, wallet));
+    res.json(await ownHomestead(wallet, req.now));
   } catch (err) {
     sendGenesisError(res, err);
   }
 });
 
+// A number nobody has is answered 200 with homestead: null (not 404), so
+// opening /homestead/<unknown> shows "not found" without a failed request in
+// the console. Reading never settles or changes Work.
 app.get('/api/homesteads/:id', async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id < 1) return res.status(404).json({ error: 'not_found', message: 'No Homestead has that number.' });
+  if (!Number.isInteger(id) || id < 1) return res.json({ homestead: null, creature: null, work: null, ownedByYou: false });
   try {
     const found = await homestead.getById(pool, id);
-    if (!found) return res.status(404).json({ error: 'not_found', message: 'No Homestead has that number.' });
+    if (!found) return res.json({ homestead: null, creature: null, work: null, ownedByYou: false });
     const wallet = genesisWallet(req);
+    found.work = await work.overview(pool, id, req.now, { settle: false });
     res.json(Object.assign(found, { ownedByYou: !!wallet && found.homestead.owner === wallet }));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// Work (lib/work.js). Every write is for the wallet's own Homestead, and
+// answers with the whole Homestead again so the page shows one truth.
+// Starting while the Creature already works, and collecting twice, are safe:
+// the server hands back the same Work and never pays out twice.
+app.post('/api/work/start', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const body = req.body || {};
+  const creatureId = Number(body.creatureId);
+  if (!Number.isInteger(creatureId) || creatureId < 1) return res.status(400).json({ error: 'bad_creature', message: 'Which Creature?' });
+  try {
+    const result = await work.start(pool, wallet, {
+      creatureId,
+      durationId: String(body.durationId || ''),
+      buildingId: body.buildingId == null ? null : String(body.buildingId),
+    }, req.now);
+    res.json(Object.assign(await ownHomestead(wallet, req.now), { started: result.started }));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/work/:id/collect', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(404).json({ error: 'not_found', message: 'No Work with that number in your Homestead.' });
+  try {
+    const result = await work.collect(pool, wallet, id, req.now);
+    res.json(Object.assign(await ownHomestead(wallet, req.now), { moved: result.moved, alreadyClaimed: result.alreadyClaimed }));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/work/collect-pending', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  try {
+    const result = await work.collectPending(pool, wallet, req.now);
+    res.json(Object.assign(await ownHomestead(wallet, req.now), { moved: result.moved }));
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -360,7 +424,17 @@ async function seedStaging() {
   const minted = await genesis.mint(pool, STAGING_DEMO_WALLET, 'staging-demo-user');
   if (minted.seed && !minted.creature) await awakenDemo(minted.seed.seedId);
   // The demo Creature's Homestead, made the same way an owner opening it does.
-  await homestead.open(pool, STAGING_DEMO_WALLET);
+  const opened = await homestead.open(pool, STAGING_DEMO_WALLET);
+  // Send the demo Creature to work once, through the real path, an hour ago
+  // for 4 hours, so the preview shows Work in progress. Later boots find
+  // Work already recorded and change nothing.
+  if (opened.creature) {
+    const any = await pool.query('SELECT 1 FROM creature_work WHERE creature_id = $1 LIMIT 1', [opened.creature.creatureId]);
+    if (!any.rows.length) {
+      await work.start(pool, STAGING_DEMO_WALLET, { creatureId: opened.creature.creatureId, durationId: '4h' },
+        new Date(Date.now() - 3600 * 1000));
+    }
+  }
 }
 async function awakenDemo(seedId) {
   const awakened = await genesis.awaken(pool, STAGING_DEMO_WALLET, seedId);
@@ -376,6 +450,7 @@ async function start() {
   const filled = await creatures.backfill(pool);
   if (filled) console.log(`[creatures] filled in ${filled} earlier Creature(s)`);
   await homestead.ensureSchema(pool);
+  await work.ensureSchema(pool);
   if (IS_STAGING) await seedStaging().catch((err) => console.warn('[staging seed]', err.message));
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.

@@ -5,6 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { Pool } = require('pg');
 const hcfg = require('../public/js/homestead-config');
+const wcfg = require('../public/js/work-config');
 const genesis = require('../lib/genesis');
 const creatures = require('../lib/creatures');
 const homestead = require('../lib/homestead');
@@ -62,8 +63,10 @@ test('Homesteads in Postgres', { skip: !url && 'DATABASE_URL is not set' }, asyn
     assert.strictEqual(h.storageCapacity, 100);
     assert.strictEqual(h.storageUsed, 0);
     assert.deepStrictEqual(h.storage, hcfg.emptyStorage());
+    // Only the building of the Creature's Trade is unlocked (PR #5 Work).
+    const tradeBuilding = wcfg.buildingFor(c.trade);
     assert.deepStrictEqual(h.buildings.map((b) => [b.buildingId, b.level, b.unlocked]),
-      hcfg.BUILDINGS.map((b) => [b.id, 0, false]));
+      hcfg.BUILDINGS.map((b) => (b.id === tradeBuilding ? [b.id, 1, true] : [b.id, 0, false])));
     assert.deepStrictEqual(first.creature, c, 'the Creature is the stored one, unchanged');
 
     for (let i = 0; i < 3; i++) {

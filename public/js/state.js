@@ -35,9 +35,21 @@
       seed: null, // this wallet's Genesis Seed
       // This wallet's Homestead and the Creature living in it (homestead.js,
       // lib/homestead.js shape). key is the wallet and Creature it was opened for.
-      homestead: { status: 'idle', key: null, homestead: null, creature: null }, // status: 'idle' | 'loading' | 'ready' | 'error'
+      // work is its Work (lib/work.js overview shape); clockOffset is the
+      // server's clock minus this device's, in ms, for the countdown.
+      homestead: {
+        status: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
+        key: null,
+        homestead: null,
+        creature: null,
+        work: null,
+        clockOffset: 0,
+        pending: null, // 'start' | 'collect' while a Work request is in flight
+        error: null, // what the last Work request could not do
+      },
       // The Homestead open at /homestead/<id> (homestead.js).
-      viewedHomestead: { status: 'idle', id: null, homestead: null, creature: null, ownedByYou: false }, // status adds 'missing'
+      viewedHomestead: { status: 'idle', id: null, homestead: null, creature: null, work: null, clockOffset: 0, ownedByYou: false }, // status adds 'missing'
+      // Resources live in the Homestead's storage (homestead.storage), not here.
       resources: {},
       homePoints: 0, // HOME Points
       gear: [],

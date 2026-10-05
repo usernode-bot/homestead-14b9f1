@@ -80,7 +80,8 @@ farming simulator, medieval fantasy or a crypto dashboard.
 
 PR #1 built the foundation: navigation, the wallet area, the Home screen and
 placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). PR #3 made
-the Creature a full collectible (below). Listings, breeding, work, training and
+the Creature a full collectible (below). PR #4 added the Homestead; PR #5 Work
+& Resources (below). Listings, breeding, training, HOME Points and
 transactions do not exist yet, and none may be faked.
 
 - **Genesis:** `lib/genesis.js` holds every rule, enforced in Postgres
@@ -104,6 +105,14 @@ transactions do not exist yet, and none may be faked.
   `public/js/creature-art.js` (SVG, colours are the `--art-*` tokens, artwork
   only) and `public/js/creature-card.js` (card, profile). Future Training and
   Gear add bonuses beside the `base_*` stats, never over them.
+- **Work:** `lib/work.js` owns every rule: a Creature works only at its
+  Trade's building (unlocked by `homestead.open`), one unfinished Work per
+  Creature (partial unique index), finished-ness always from `started_at` +
+  duration and the request's `req.now`, rewards rolled once when settled,
+  `collected` never above the reward (trigger), overflow kept pending on the
+  record. Balance (durations, Trade -> building, per-hour ranges, resource
+  groups, history size) is only in `public/js/work-config.js`. Work never
+  produces HOME Points and never changes the Creature.
 - **Supply cap:** there can never be more than 5,000 Creatures.
   `MAX_CREATURE_SUPPLY` in `public/js/config.js` is the only place that number
   is written. The page reads it as `window.HOMESTEAD_CONFIG`, the server as

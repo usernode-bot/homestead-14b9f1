@@ -1,7 +1,11 @@
 // HOMESTEAD Homestead view: how a stored Homestead is shown.
 //
 // - page(h, c, opts): the whole Homestead: level and capacity, the scene with
-//   its Creature in the middle, the buildings and storage.
+//   its Creature in the middle and its Work status, then Work, Resources
+//   (storage and the inventory), Buildings and Work history.
+//   opts: { work (lib/work.js overview), canAct (the owner, on their own
+//   Homestead: shows the Work buttons), pending, error, scope ('own' |
+//   'viewed', for the countdown) }.
 //
 // It only draws what the server stored. The Creature comes from the PR #3
 // card and art (its name is a <span data-creature-name>, filled in as text by
@@ -12,6 +16,7 @@
   var ccfg = window.HOMESTEAD_CREATURE_CONFIG;
   var cards = window.HOMESTEAD_CREATURE_CARD;
   var artwork = window.HOMESTEAD_CREATURE_ART;
+  var wcfg = window.HOMESTEAD_WORK_CONFIG;
 
   function fmt(n) { return Number(n).toLocaleString('en-US'); }
 
@@ -110,8 +115,61 @@
     return sp ? sp.label : 'Creature';
   }
 
+  function tradeLabel(id) {
+    var t = ccfg.byId(ccfg.TRADES, id);
+    return t ? t.label : 'Worker';
+  }
+
+  function resourceLabel(key) {
+    var r = hcfg.RESOURCES.find(function (x) { return x.key === key; });
+    return r ? r.label : '';
+  }
+
+  // "Stone ×74", for each configured resource with an amount, in config order.
+  function amounts(list) {
+    var items = hcfg.RESOURCES.filter(function (r) { return Number(list && list[r.key]) > 0; });
+    if (!items.length) return '<p class="text-small text-muted">Nothing this time.</p>';
+    return '<ul class="flex flex-wrap gap-x-4 gap-y-1 text-body">' + items.map(function (r) {
+      return '<li data-reward="' + r.key + '"><span>' + r.label + '</span> <span class="font-black tabular-nums">×' + fmt(list[r.key]) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+
+  // This Creature's unfinished Work, if any.
+  function activeFor(work, c) {
+    if (!work || !c) return null;
+    return work.active.find(function (w) { return w.creatureId === c.creatureId; }) || null;
+  }
+
+  function hoursLabel(seconds) {
+    var h = Math.round(Number(seconds) / 3600);
+    return h + (h === 1 ? ' hour' : ' hours');
+  }
+
+  // A start time as a clock time, with the date when it is not today.
+  function whenLabel(iso) {
+    var d = new Date(iso);
+    var today = new Date();
+    var sameDay = d.toDateString() === today.toDateString();
+    return d.toLocaleString([], sameDay
+      ? { hour: '2-digit', minute: '2-digit' }
+      : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // IDLE, WORKING (and what) or WORK COMPLETE, beside the Creature.
+  function statusLine(c, w) {
+    var t = wcfg.trade(c.trade);
+    if (!w) {
+      return '<span class="inline-flex items-center gap-1.5 font-bold" data-creature-status="idle"><span class="h-2 w-2 rounded-full bg-muted" aria-hidden="true"></span>IDLE</span>';
+    }
+    if (w.status === 'working') {
+      return '<span class="inline-flex items-center gap-1.5 font-bold text-fg" data-creature-status="working"><span class="h-2 w-2 rounded-full bg-accent" aria-hidden="true"></span>WORKING</span>' +
+        '<span class="inline-flex items-center gap-1.5">' + icon(w.buildingId, 'h-4 w-4 text-punk') + (t ? t.doing : 'Working') + '</span>';
+    }
+    return '<span class="inline-flex items-center gap-1.5 font-bold text-fg" data-creature-status="completed"><span class="h-2 w-2 rounded-full bg-punk" aria-hidden="true"></span>WORK COMPLETE</span>';
+  }
+
   // Who lives here: name, Species, rarity, level and a small status line.
-  function residentInfo(c) {
+  function residentInfo(c, work) {
     if (!c) {
       return '<div class="mt-4 text-center" data-homestead-creature="none">' +
         '<p class="text-heading font-black">Nobody lives here right now.</p>' +
@@ -124,15 +182,16 @@
         '<span class="font-bold tabular-nums">Lv. ' + Number(c.level) + '</span>' +
       '</p>' +
       '<p class="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-small text-muted">' +
-        '<span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-accent" aria-hidden="true"></span>At home</span>' +
+        '<span class="font-bold">' + tradeLabel(c.trade) + '</span>' +
+        statusLine(c, activeFor(work, c)) +
         '<a href="/creature/' + Number(c.creatureId) + '" data-nav class="font-mono underline decoration-punk underline-offset-4 hover:text-fg">' + cards.formatId(c.creatureId) + '</a>' +
       '</p>' +
     '</div>';
   }
 
-  function buildingTile(b) {
+  function buildingTile(b, workerTrade) {
     var status = b.unlocked
-      ? '<span class="rarity-badge bg-accent text-on-accent">LEVEL ' + Number(b.level) + '</span>'
+      ? '<span class="rarity-badge bg-accent text-on-accent" data-building-status="available">AVAILABLE</span>'
       : '<span class="inline-flex items-center gap-1 rounded-md bg-raised px-2 py-0.5 text-small font-black tracking-wide text-muted" data-building-status="locked">' + icon('lock', 'h-3.5 w-3.5') + 'LOCKED</span>';
     var def = hcfg.building(b.buildingId);
     return '<li class="card flex flex-col gap-2" data-building="' + (def ? def.id : '') + '" data-unlocked="' + (b.unlocked ? 'true' : 'false') + '">' +
@@ -142,17 +201,135 @@
       '</div>' +
       '<h3 class="text-body font-black">' + (def ? def.name : '') + '</h3>' +
       '<p class="text-small text-muted">' + (def ? def.description : '') + '</p>' +
-      (b.unlocked ? '' : '<p class="mt-auto border-t border-line pt-2 text-small text-muted">' + hcfg.LOCKED_NOTE + '</p>') +
+      '<p class="mt-auto border-t border-line pt-2 text-small text-muted">' +
+        (b.unlocked
+          ? 'Level ' + Number(b.level) + (workerTrade ? '. Your ' + tradeLabel(workerTrade) + ' works here.' : '')
+          : hcfg.LOCKED_NOTE) +
+      '</p>' +
     '</li>';
   }
 
-  function storageSection(h) {
+  // Work for one Creature: choose a duration, the countdown, or the rewards
+  // waiting to be collected.
+  function workSection(c, opts) {
+    var work = opts.work;
+    var w = activeFor(work, c);
+    var t = wcfg.trade(c.trade);
+    var buildingId = (w && w.buildingId) || wcfg.buildingFor(c.trade);
+    var def = hcfg.building(buildingId);
+    var busy = !!opts.pending;
+    var header =
+      '<li class="list-row">' +
+        '<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-raised text-punk">' + icon(buildingId) + '</span>' +
+        '<span class="min-w-0">' +
+          '<span class="block text-body font-black">' + (def ? def.name.toUpperCase() : '') + '</span>' +
+          '<span class="block truncate text-small text-muted">' + cards.nameSpan(c) + ' · ' + tradeLabel(c.trade) + '</span>' +
+        '</span>' +
+      '</li>';
+    var body;
+    var status = 'idle';
+    if (!w) {
+      var makes = t ? Object.keys(t.perHour).map(resourceLabel).filter(Boolean) : [];
+      var makesText = makes.length > 1 ? makes.slice(0, -1).join(', ') + ' and ' + makes[makes.length - 1] : makes.join('');
+      body =
+        '<li class="list-row flex-col items-stretch gap-3">' +
+          '<p class="text-body"><span class="font-black">IDLE.</span> ' +
+            (opts.canAct ? 'Choose how long to work. ' : 'Not working right now. ') +
+            '<span class="text-muted">Brings home ' + makesText + '.</span></p>' +
+          (opts.canAct
+            ? '<div class="grid grid-cols-3 gap-2" role="group" aria-label="How long to work">' + wcfg.DURATIONS.map(function (d) {
+                return '<button type="button" class="btn-secondary px-2" data-action="work-start" data-duration="' + d.id + '" data-building="' + buildingId + '" data-creature-id="' + Number(c.creatureId) + '"' +
+                  ' aria-label="' + (t ? t.doing : 'Work') + ' for ' + hoursLabel(d.hours * 3600) + '"' + (busy ? ' disabled' : '') + '>' + d.label + '</button>';
+              }).join('') + '</div>'
+            : '') +
+        '</li>';
+    } else if (w.status === 'working') {
+      status = 'working';
+      var now = Date.now() + (opts.clockOffset || 0);
+      var span = Date.parse(w.endsAt) - Date.parse(w.startedAt);
+      var done = span > 0 ? Math.min(100, Math.max(0, ((now - Date.parse(w.startedAt)) / span) * 100)) : 0;
+      body =
+        '<li class="list-row flex-col items-stretch gap-3" data-work-id="' + Number(w.workId) + '" data-work-scope="' + (opts.scope === 'own' ? 'own' : 'viewed') + '"' +
+          ' data-work-started="' + w.startedAt + '" data-work-ends="' + w.endsAt + '">' +
+          '<p class="text-body"><span class="font-black">WORKING.</span> ' + (t ? t.doing : 'Working') + ' at ' + (def ? def.name : '') + '.</p>' +
+          '<span class="block h-2 overflow-hidden rounded-full bg-raised" aria-hidden="true">' +
+            '<span class="block h-full rounded-full bg-accent" data-work-progress style="width:' + done + '%"></span>' +
+          '</span>' +
+          '<dl class="grid grid-cols-3 gap-2 text-small">' +
+            '<div><dt class="text-muted">Started</dt><dd class="font-bold tabular-nums">' + whenLabel(w.startedAt) + '</dd></div>' +
+            '<div><dt class="text-muted">Duration</dt><dd class="font-bold">' + hoursLabel(w.durationSeconds) + '</dd></div>' +
+            '<div><dt class="text-muted">Time remaining</dt><dd class="font-bold tabular-nums" data-work-remaining>' +
+              wcfg.formatSpan(Date.parse(w.endsAt) - now) + '</dd></div>' +
+          '</dl>' +
+        '</li>';
+    } else {
+      status = 'completed';
+      body =
+        '<li class="list-row flex-col items-stretch gap-3" data-work-id="' + Number(w.workId) + '">' +
+          '<p class="text-heading font-black">WORK COMPLETE</p>' +
+          '<p class="text-body">' + cards.nameSpan(c) + ' finished ' + (t ? t.done : 'working') + '.</p>' +
+          (w.rewards
+            ? amounts(w.rewards)
+            : '<p class="text-small text-muted">The rewards are counted when the owner next opens this Homestead.</p>') +
+          (opts.canAct && w.rewards
+            ? '<button type="button" class="btn-primary self-start" data-action="work-collect" data-work-id="' + Number(w.workId) + '"' + (busy ? ' disabled' : '') + '>' +
+                (opts.pending === 'collect' ? 'COLLECTING…' : 'COLLECT') + '</button>'
+            : '') +
+        '</li>';
+    }
+    return '<ul class="list" data-work-creature="' + Number(c.creatureId) + '" data-work-status="' + status + '">' + header + body + '</ul>';
+  }
+
+  function workSections(c, opts) {
+    var residents = c ? [c] : [];
+    return '<section class="mt-8" data-work>' +
+      '<h2 class="section-label">Work</h2>' +
+      (residents.length
+        ? '<div class="flex flex-col gap-3">' + residents.map(function (r) { return workSection(r, opts); }).join('') + '</div>'
+        : '<ul class="list"><li class="list-row"><span class="text-muted">Nobody lives here to work right now.</span></li></ul>') +
+      (opts.error ? '<p role="alert" class="mt-2 px-1 text-small text-danger" data-field="work-error"></p>' : '') +
+    '</section>';
+  }
+
+  // Storage (used / capacity), what is waiting for space, and every resource
+  // by group.
+  function resourcesSection(h, opts) {
     var used = Number(h.storageUsed) || 0;
     var cap = Number(h.storageCapacity) || 0;
     var pct = cap ? Math.min(100, (used / cap) * 100) : 0;
-    var held = hcfg.RESOURCES.filter(function (r) { return Number(h.storage[r.key]) > 0; });
-    return '<section class="mt-8" data-storage>' +
-      '<h2 class="section-label">Storage</h2>' +
+    var work = opts.work;
+    var waiting = work ? Number(work.pendingTotal) || 0 : 0;
+    var free = Math.max(0, cap - used);
+    var pendingRow = '';
+    if (waiting > 0) {
+      pendingRow =
+        '<li class="list-row flex-col items-stretch gap-2" data-storage-full="' + (free ? 'false' : 'true') + '">' +
+          '<p class="text-body font-black text-punk">' + (free ? 'REWARDS WAITING' : 'STORAGE FULL') + '</p>' +
+          '<p class="text-small">' + (free
+            ? 'Some rewards did not fit last time. There is space for ' + fmt(free) + ' more now.'
+            : 'Your work is complete, but there is not enough storage space. Free some storage before collecting the remaining rewards.') +
+          '</p>' +
+          '<p class="text-small text-muted">Waiting, safe on your Work: ' + fmt(waiting) + '</p>' +
+          amounts(work.pending) +
+          (opts.canAct && free
+            ? '<button type="button" class="btn-secondary self-start" data-action="work-collect-pending"' + (opts.pending ? ' disabled' : '') + '>Collect the rest</button>'
+            : '') +
+        '</li>';
+    }
+    var groups = wcfg.RESOURCE_GROUPS.map(function (g) {
+      return '<li class="list-row flex-col items-stretch gap-2" data-resource-group="' + g.id + '">' +
+        '<span class="text-small font-bold text-muted">' + g.label + '</span>' +
+        '<span class="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">' + g.keys.map(function (key) {
+          var n = Number(h.storage[key]) || 0;
+          return '<span class="flex items-center justify-between gap-2" data-resource="' + key + '">' +
+            '<span class="' + (n ? '' : 'text-muted') + '">' + resourceLabel(key) + '</span>' +
+            '<span class="tabular-nums ' + (n ? 'font-bold' : 'text-muted') + '">×' + fmt(n) + '</span>' +
+          '</span>';
+        }).join('') + '</span>' +
+      '</li>';
+    }).join('');
+    return '<section class="mt-8" data-storage data-resources>' +
+      '<h2 class="section-label">Resources</h2>' +
       '<ul class="list">' +
         '<li class="list-row flex-col items-stretch gap-3">' +
           '<span class="flex items-center justify-between gap-3">' +
@@ -162,17 +339,40 @@
           '<span class="block h-2 overflow-hidden rounded-full bg-raised" role="progressbar" aria-label="Storage used" aria-valuemin="0" aria-valuemax="' + cap + '" aria-valuenow="' + used + '">' +
             '<span class="block h-full rounded-full bg-accent" style="width:' + pct + '%"></span>' +
           '</span>' +
+          (used ? '' : '<span class="text-small text-muted" data-storage-empty>Empty. Work brings resources home here.</span>') +
         '</li>' +
-        (held.length
-          ? held.map(function (r) {
-              return '<li class="list-row justify-between"><span>' + r.label + '</span><span class="font-bold tabular-nums">' + fmt(h.storage[r.key]) + '</span></li>';
-            }).join('')
-          : '<li class="list-row" data-storage-empty><span class="text-muted">Empty. Nothing is stored here yet.</span></li>') +
+        pendingRow +
+        groups +
       '</ul>' +
     '</section>';
   }
 
-  function page(h, c) {
+  // The latest finished Work, newest first.
+  function historySection(work, c) {
+    var entries = work ? work.history : [];
+    var rows = entries.map(function (w) {
+      var t = wcfg.trade(w.trade);
+      var who = c && c.creatureId === w.creatureId ? cards.nameSpan(c) : cards.formatId(w.creatureId);
+      var waiting = Number(w.pendingTotal) || 0;
+      return '<li class="list-row flex-col items-stretch gap-1" data-work-history-entry="' + Number(w.workId) + '">' +
+        '<span class="flex items-center justify-between gap-3">' +
+          '<span class="min-w-0 truncate font-bold">' + who + ' · ' + (t ? t.doing : 'Work') + '</span>' +
+          '<span class="text-small text-muted tabular-nums">' + Math.round(w.durationSeconds / 3600) + 'h</span>' +
+        '</span>' +
+        amounts(w.rewards) +
+        (waiting ? '<span class="text-small text-punk">' + fmt(waiting) + ' waiting for storage space</span>' : '') +
+      '</li>';
+    }).join('');
+    return '<section class="mt-8" data-work-history>' +
+      '<h2 class="section-label">Work history</h2>' +
+      '<ul class="list">' +
+        (rows || '<li class="list-row"><span class="text-muted">No finished Work yet. Collected Work shows here.</span></li>') +
+      '</ul>' +
+    '</section>';
+  }
+
+  function page(h, c, opts) {
+    opts = opts || {};
     var residents = c ? 1 : 0;
     return '<div class="max-w-3xl" data-homestead="' + Number(h.homesteadId) + '">' +
       '<section class="collectible">' +
@@ -188,13 +388,17 @@
           '</div>' +
         '</div>' +
         scene(c) +
-        residentInfo(c) +
+        residentInfo(c, opts.work) +
       '</section>' +
+      workSections(c, opts) +
+      resourcesSection(h, opts) +
       '<section class="mt-8">' +
         '<h2 class="section-label">Buildings</h2>' +
-        '<ul class="grid grid-cols-2 gap-3 lg:grid-cols-3" data-buildings>' + h.buildings.map(buildingTile).join('') + '</ul>' +
+        '<ul class="grid grid-cols-2 gap-3 lg:grid-cols-3" data-buildings>' + h.buildings.map(function (b) {
+          return buildingTile(b, c && wcfg.buildingFor(c.trade) === b.buildingId ? c.trade : null);
+        }).join('') + '</ul>' +
       '</section>' +
-      storageSection(h) +
+      historySection(opts.work, c) +
     '</div>';
   }
 
