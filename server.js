@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const genesis = require('./lib/genesis');
 const creatures = require('./lib/creatures');
+const homestead = require('./lib/homestead');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -260,6 +261,33 @@ app.post('/api/creatures/:id/name', async (req, res) => {
   }
 });
 
+// Homesteads (lib/homestead.js). Opening your own needs a linked wallet: it
+// is created the first time that wallet owns a Creature, and the Creature in
+// it is always the one the wallet owns now (checked on the server, never
+// named by the browser). Anyone can look at a Homestead by its number.
+app.post('/api/homestead', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  try {
+    res.json(await homestead.open(pool, wallet));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.get('/api/homesteads/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) return res.status(404).json({ error: 'not_found', message: 'No Homestead has that number.' });
+  try {
+    const found = await homestead.getById(pool, id);
+    if (!found) return res.status(404).json({ error: 'not_found', message: 'No Homestead has that number.' });
+    const wallet = genesisWallet(req);
+    res.json(Object.assign(found, { ownedByYou: !!wallet && found.homestead.owner === wallet }));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated. Unauthenticated top-level
@@ -330,8 +358,12 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 const STAGING_DEMO_WALLET = 'ut1stagingdemowallet';
 async function seedStaging() {
   const minted = await genesis.mint(pool, STAGING_DEMO_WALLET, 'staging-demo-user');
-  if (!minted.seed || minted.creature) return;
-  const awakened = await genesis.awaken(pool, STAGING_DEMO_WALLET, minted.seed.seedId);
+  if (minted.seed && !minted.creature) await awakenDemo(minted.seed.seedId);
+  // The demo Creature's Homestead, made the same way an owner opening it does.
+  await homestead.open(pool, STAGING_DEMO_WALLET);
+}
+async function awakenDemo(seedId) {
+  const awakened = await genesis.awaken(pool, STAGING_DEMO_WALLET, seedId);
   if (awakened.created) {
     await creatures.rename(pool, STAGING_DEMO_WALLET, awakened.creature.creatureId, 'Staging demo');
   }
@@ -343,6 +375,7 @@ async function start() {
   // Creatures awakened before the generator existed get their traits once.
   const filled = await creatures.backfill(pool);
   if (filled) console.log(`[creatures] filled in ${filled} earlier Creature(s)`);
+  await homestead.ensureSchema(pool);
   if (IS_STAGING) await seedStaging().catch((err) => console.warn('[staging seed]', err.message));
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.

@@ -5,6 +5,7 @@
   var screens = window.HOMESTEAD_SCREENS;
   var genesis = window.HOMESTEAD_GENESIS;
   var creatures = window.HOMESTEAD_CREATURES;
+  var homesteads = window.HOMESTEAD_HOMESTEADS;
   var navEl = document.getElementById('nav');
   var walletEl = document.getElementById('wallet');
   var viewEl = document.getElementById('view');
@@ -12,6 +13,8 @@
 
   // A Creature by id, /creature/<id>, belongs under MY CREATURE in the nav.
   var CREATURE_PATH = /^\/creature\/(\d{1,9})$/;
+  // A Homestead by its number, /homestead/<id>, belongs under HOMESTEAD.
+  var HOMESTEAD_PATH = /^\/homestead\/(\d{1,9})$/;
 
   function currentRoute() {
     var path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -20,13 +23,18 @@
       var mine = screens.ROUTES.find(function (r) { return r.key === 'creature'; });
       return { path: path, key: 'creatureById', label: 'CREATURE', nav: mine, creatureId: Number(m[1]) };
     }
+    var hm = HOMESTEAD_PATH.exec(path);
+    if (hm) {
+      var home = screens.ROUTES.find(function (r) { return r.key === 'homestead'; });
+      return { path: path, key: 'homesteadById', label: 'HOMESTEAD', nav: home, homesteadId: Number(hm[1]) };
+    }
     return screens.ROUTES.find(function (r) { return r.path === path; }) || screens.ROUTES[0];
   }
 
   function renderNav(route) {
     navEl.innerHTML = screens.ROUTES.map(function (r) {
       return '<li><a href="' + r.path + '" data-nav class="nav-tab"' +
-        (r === route || (r === route.nav && store.get().viewedCreature.ownedByYou) ? ' aria-current="page"' : '') + '>' +
+        (r === route || (r === route.nav && (route.homesteadId || store.get().viewedCreature.ownedByYou)) ? ' aria-current="page"' : '') + '>' +
         screens.icon(r.key, 'h-4 w-4') + r.label + '</a></li>';
     }).join('');
     var active = navEl.querySelector('[aria-current="page"]');
@@ -76,7 +84,7 @@
     });
     // Creature names: typed by their owners, so always set as text.
     var nameById = {};
-    [state.creature, state.viewedCreature.creature].concat(state.collection.creatures).forEach(function (c) {
+    [state.creature, state.viewedCreature.creature, state.homestead.creature, state.viewedHomestead.creature].concat(state.collection.creatures).forEach(function (c) {
       if (c) nameById[c.creatureId] = c.name;
     });
     document.querySelectorAll('[data-creature-name]').forEach(function (el) {
@@ -94,6 +102,10 @@
     var route = currentRoute();
     // Starts the load (which re-renders) only when this Creature isn't showing.
     if (route.creatureId) creatures.view(route.creatureId);
+    if (route.homesteadId) homesteads.view(route.homesteadId);
+    // Opens this wallet's Homestead (which re-renders) only when it isn't
+    // already open for this wallet and Creature. Never during the render itself.
+    if (route.key === 'homestead') homesteads.open();
     var state = store.get();
     document.title = route.label === 'HOME' || route.label === 'HOMESTEAD' ? 'HOMESTEAD' : route.label + ' · HOMESTEAD';
     renderNav(route);
@@ -129,6 +141,8 @@
       else if (name === 'genesis-retry') genesis.load();
       else if (name === 'collection-retry') creatures.loadCollection();
       else if (name === 'creature-retry') creatures.view(currentRoute().creatureId, true);
+      else if (name === 'homestead-retry') { if (store.get().genesis.status === 'error') genesis.load(); else homesteads.open(true); }
+      else if (name === 'homestead-view-retry') homesteads.view(currentRoute().homesteadId, true);
       else if (name === 'rename') {
         var holder = action.closest('[data-creature-id]');
         creatures.openRename(holder && creatureFor(Number(holder.dataset.creatureId)));

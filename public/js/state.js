@@ -33,7 +33,11 @@
       // The Creature open at /creature/<id> (creatures.js).
       viewedCreature: { status: 'idle', id: null, creature: null, ownedByYou: false }, // status adds 'missing'
       seed: null, // this wallet's Genesis Seed
-      homestead: null, // the Creature's home
+      // This wallet's Homestead and the Creature living in it (homestead.js,
+      // lib/homestead.js shape). key is the wallet and Creature it was opened for.
+      homestead: { status: 'idle', key: null, homestead: null, creature: null }, // status: 'idle' | 'loading' | 'ready' | 'error'
+      // The Homestead open at /homestead/<id> (homestead.js).
+      viewedHomestead: { status: 'idle', id: null, homestead: null, creature: null, ownedByYou: false }, // status adds 'missing'
       resources: {},
       homePoints: 0, // HOME Points
       gear: [],

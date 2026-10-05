@@ -262,7 +262,8 @@
     }
   }
 
-  // Returns an SVG string. opts.cls sets its classes.
+  // Returns an SVG string. opts.cls sets its classes; opts.bare leaves out the
+  // background, so the Creature can stand in a scene (the Homestead).
   function render(a, opts) {
     opts = opts || {};
     a = a || {};
@@ -280,7 +281,7 @@
     var out = '<svg viewBox="0 0 120 120" class="' + (opts.cls || 'h-24 w-24') + '" aria-hidden="true" focusable="false">' +
       '<defs><clipPath id="' + id + 'b"><path d="' + BODIES[body] + '"/></clipPath>' +
       '<filter id="' + id + 'g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>' +
-      background(a.background) +
+      (opts.bare ? '' : background(a.background)) +
       '<g stroke-linejoin="round" stroke-linecap="round" style="color:' + skin + '">';
 
     if (mutation === 'tail') out += limb('M72 100Q100 106 98 82', skin, O, 5) + path('M92 84L99 72L104 85Z', skin, O, 2.5);

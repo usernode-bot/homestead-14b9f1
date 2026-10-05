@@ -40,10 +40,44 @@
       "expectText": "No Creature yet."
     },
     {
-      "name": "Homestead placeholder",
+      "name": "Homestead asks to connect a wallet",
       "path": "/homestead",
-      "expectSelector": "[data-empty=\"homestead\"]",
-      "expectText": "Your Homestead is waiting for its Creature."
+      "expectSelector": "[data-empty=\"homestead\"] [data-action=\"connect\"]",
+      "expectText": "CONNECT HOMEROOM WALLET"
+    },
+    {
+      "id": "homestead.view",
+      "name": "A Homestead shows its level, Creature, locked buildings and empty storage",
+      "path": "/homestead/1",
+      "expectSelector": "[data-homestead] [data-homestead-resident]",
+      "expectText": "Level 1",
+      "visual": true,
+      "impact": [
+        "public/js/homestead*.js",
+        "public/js/screens.js",
+        "public/js/app.js",
+        "public/js/creature-art.js",
+        "lib/homestead.js",
+        "styles/**"
+      ]
+    },
+    {
+      "name": "A Homestead's six buildings start locked",
+      "path": "/homestead/1",
+      "expectSelector": "[data-buildings] [data-building=\"mystic-shrine\"][data-unlocked=\"false\"] [data-building-status=\"locked\"]",
+      "expectText": "Requires future Homestead progression."
+    },
+    {
+      "name": "A new Homestead's storage is empty",
+      "path": "/homestead/1",
+      "expectSelector": "[data-storage] [data-storage-used=\"0\"][data-storage-capacity=\"100\"]",
+      "expectText": "0 / 100"
+    },
+    {
+      "name": "An unknown Homestead number shows not found",
+      "path": "/homestead/999999",
+      "expectSelector": "[data-empty=\"homestead-missing\"]",
+      "expectText": "No Homestead has that number."
     },
     {
       "name": "Marketplace placeholder",
