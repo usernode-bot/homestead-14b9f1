@@ -10,10 +10,10 @@
   "tests": [
     {
       "id": "home.supply",
-      "name": "Home shows the tagline and 0 / 5,000 supply",
+      "name": "Home shows the tagline and the live Creature supply",
       "path": "/",
       "expectSelector": "#supply-count",
-      "expectText": "0 / 5,000",
+      "expectText": "/ 5,000",
       "visual": true,
       "impact": [
         "public/**",
@@ -26,6 +26,12 @@
       "path": "/",
       "expectSelector": "#wallet [data-action=\"connect\"]",
       "expectText": "CONNECT WALLET"
+    },
+    {
+      "name": "Home shows Genesis with GENESIS MINT",
+      "path": "/",
+      "expectSelector": "#genesis [data-action=\"genesis-mint\"]",
+      "expectText": "GENESIS MINT"
     },
     {
       "name": "My Creature placeholder",

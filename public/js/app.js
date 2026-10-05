@@ -3,6 +3,7 @@
   var store = window.HOMESTEAD_STORE;
   var wallet = window.HOMESTEAD_WALLET;
   var screens = window.HOMESTEAD_SCREENS;
+  var genesis = window.HOMESTEAD_GENESIS;
   var navEl = document.getElementById('nav');
   var walletEl = document.getElementById('wallet');
   var viewEl = document.getElementById('view');
@@ -59,6 +60,7 @@
       address: w.address || '',
       username: w.username ? '@' + w.username : '',
       error: w.error || '',
+      'genesis-error': state.genesis.error || '',
     };
     document.querySelectorAll('[data-field]').forEach(function (el) {
       el.textContent = values[el.dataset.field] || '';
@@ -97,6 +99,9 @@
       if (name === 'connect') wallet.connect(false);
       else if (name === 'disconnect') { walletMenuOpen = false; wallet.disconnect(); }
       else if (name === 'wallet-menu') { walletMenuOpen = !walletMenuOpen; render(); }
+      else if (name === 'genesis-mint') genesis.mint();
+      else if (name === 'awaken') genesis.awaken();
+      else if (name === 'genesis-retry') genesis.load();
       return;
     }
     // A tap anywhere else closes the wallet menu or dismisses its message.
@@ -112,5 +117,6 @@
   store.subscribe(render);
 
   render();
+  genesis.load();
   wallet.restore();
 })();
