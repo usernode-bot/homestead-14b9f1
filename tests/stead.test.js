@@ -19,10 +19,11 @@ test('STEAD config', () => {
   assert.strictEqual(cfg.addDays('2026-03-01', -1), '2026-02-28');
   assert.strictEqual(cfg.formatSigned(1240), '+1,240');
   assert.strictEqual(cfg.formatSigned(-50), '-50');
-  // Daily Check-in and Training are live; the rest are reserved, spending types.
+  // Daily Check-in, Training, Contest rewards and Genesis are live; the rest
+  // are reserved, spending types.
   const active = Object.keys(cfg.TYPES).filter((k) => cfg.TYPES[k].active);
-  assert.deepStrictEqual(active, ['DAILY_CHECKIN', 'TRAINING', 'CONTEST_REWARD']);
-  for (const k of ['TRAINING', 'FEEDING', 'GEAR', 'UPGRADE', 'MARKETPLACE_FEE', 'BREEDING']) {
+  assert.deepStrictEqual(active, ['DAILY_CHECKIN', 'TRAINING', 'CONTEST_REWARD', 'GENESIS']);
+  for (const k of ['TRAINING', 'GENESIS', 'FEEDING', 'GEAR', 'UPGRADE', 'MARKETPLACE_FEE', 'BREEDING']) {
     assert.strictEqual(cfg.TYPES[k].direction, 'debit', k);
   }
 });

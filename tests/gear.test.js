@@ -9,6 +9,7 @@ const cfg = require('../public/js/gear-config');
 const care = require('../public/js/care-config');
 const creatureCfg = require('../public/js/creature-config');
 const genesis = require('../lib/genesis');
+const { fundAndMint } = require('./support');
 const creatures = require('../lib/creatures');
 const homestead = require('../lib/homestead');
 const work = require('../lib/work');
@@ -59,7 +60,7 @@ test('Gear in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
 
   async function reset() {
     await pool.query(`DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts,
-      creature_work, homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE`);
+      creature_work, homestead_buildings, homesteads, creatures, seeds, genesis_wallets CASCADE`);
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
     await work.ensureSchema(pool);
@@ -69,7 +70,7 @@ test('Gear in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
     await require('../lib/contests').ensureSchema(pool);
   }
   async function creatureFor(wallet) {
-    const m = await genesis.mint(pool, wallet, wallet);
+    const m = await fundAndMint(pool, wallet, wallet);
     return (await genesis.awaken(pool, wallet, m.seed.seedId)).creature;
   }
   async function kit(wallet) {
@@ -146,8 +147,9 @@ test('Gear in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
     assert.strictEqual(now.gear.tool, null);
     assert.strictEqual(now.effectiveStats.attack, before.stats.attack);
     assert.strictEqual(now.effectiveStats.luck, before.stats.luck + 8);
-    // Nothing was spent and no STEAD entry was written.
-    assert.strictEqual((await pool.query('SELECT COUNT(*)::int AS n FROM stead_ledger')).rows[0].n, 0);
+    // Nothing was spent and no STEAD entry was written (besides the Genesis
+    // that made the Creature, and the test credit that paid for it).
+    assert.strictEqual((await pool.query("SELECT COUNT(*)::int AS n FROM stead_ledger WHERE type <> 'GENESIS' AND NOT (metadata ? 'test')")).rows[0].n, 0);
   });
 
   await t.test('only the owner equips their own Gear on their own Creature, in the right slot', async () => {
@@ -198,10 +200,9 @@ test('Gear in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
     assert.strictEqual((await gear.inventory(pool, 'ut1alice')).items.length, cfg.STARTER_KIT.length);
   });
 
-  await t.test('Gear stays on through Work, Training and Feeding, and leaves the supply alone', async () => {
+  await t.test('Gear stays on through Work, Training and Feeding, and makes no Creature', async () => {
     await reset();
     const c = await creatureFor('ut1alice');
-    const supply = (await pool.query('SELECT created FROM creature_supply')).rows[0].created;
     const g = await kit('ut1alice');
     await gear.equip(pool, 'ut1alice', c.creatureId, g['moon-hammer'], 'tool');
     await homestead.open(pool, 'ut1alice');
@@ -226,7 +227,6 @@ test('Gear in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
     assert.strictEqual(shown.gear.tool.gearId, g['moon-hammer']);
     assert.strictEqual(shown.gear.accessory.gearId, g['lucky-bone']);
     assert.strictEqual(shown.stats.attack, c.stats.attack);
-    assert.strictEqual((await pool.query('SELECT created FROM creature_supply')).rows[0].created, supply);
     assert.strictEqual((await pool.query('SELECT COUNT(*)::int AS n FROM creatures')).rows[0].n, 1);
   });
 });

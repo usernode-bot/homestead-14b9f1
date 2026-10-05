@@ -7,6 +7,7 @@ const assert = require('node:assert');
 const { Pool } = require('pg');
 const cfg = require('../public/js/care-config');
 const genesis = require('../lib/genesis');
+const { fundAndMint } = require('./support');
 const creatures = require('../lib/creatures');
 const homestead = require('../lib/homestead');
 const work = require('../lib/work');
@@ -72,7 +73,7 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
 
   async function reset() {
     await pool.query(`DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts, creature_work,
-      homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE`);
+      homestead_buildings, homesteads, creatures, seeds, genesis_wallets CASCADE`);
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
     await work.ensureSchema(pool);
@@ -87,7 +88,7 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
   // as of T0, `fodder` Fodder in storage and `steadPoints` STEAD.
   async function setup(wallet, opts) {
     opts = opts || {};
-    const m = await genesis.mint(pool, wallet, wallet);
+    const m = await fundAndMint(pool, wallet, wallet);
     const c = (await genesis.awaken(pool, wallet, m.seed.seedId)).creature;
     if (opts.trade && c.trade !== opts.trade) {
       await pool.query('ALTER TABLE creatures DISABLE TRIGGER USER');
@@ -109,7 +110,7 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
 
   await t.test('a new Creature starts full, fed at Awaken, with no training', async () => {
     await reset();
-    const m = await genesis.mint(pool, 'ut1alice', 'ut1alice');
+    const m = await fundAndMint(pool, 'ut1alice', 'ut1alice');
     const c = (await genesis.awaken(pool, 'ut1alice', m.seed.seedId)).creature;
     const row = (await pool.query('SELECT * FROM creatures WHERE id = $1', [c.creatureId])).rows[0];
     assert.strictEqual(row.hunger, 100);

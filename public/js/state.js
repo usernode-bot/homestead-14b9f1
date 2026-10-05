@@ -13,21 +13,24 @@
         username: null,
         error: null, // why the last connect attempt did not connect
       },
-      // Global Creature supply, read from the server (genesis.js). The cap
-      // always comes from HOMESTEAD_CONFIG.MAX_CREATURE_SUPPLY.
-      supply: { status: 'loading', created: 0 }, // status: 'loading' | 'ready' | 'error'
-      // This wallet's one Genesis (see genesis.js and lib/genesis.js).
+      // How many Creatures this wallet holds, out of
+      // HOMESTEAD_CONFIG.MAX_OWNED_CREATURES: owned now plus Seeds waiting to
+      // be awakened, as the server counted them (lib/ownership.js).
+      slots: { status: 'idle', owned: 0, creatures: 0, dormantSeeds: 0, max: 0 }, // status: 'idle' | 'loading' | 'ready' | 'error'
+      // This wallet's Genesis (see genesis.js and lib/genesis.js): repeatable,
+      // for HOMESTEAD_CONFIG.GENESIS_COST STEAD each.
       genesis: {
         status: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
         walletId: null,
         genesisUsed: false,
-        genesisSeedId: null,
-        genesisCreatureId: null,
+        history: [], // the Geneses this wallet used, newest first
+        confirming: false, // the "Spend 5,000 STEAD?" step is showing
         pending: null, // 'mint' | 'awaken' while a request is in flight
         notice: null, // 'seed-created' | 'creature-awakened' after one succeeds
+        awakenedId: null, // the Creature the last Awaken made
         error: null, // what the last mint or awaken could not do
       },
-      creature: null, // this wallet's Genesis Creature (lib/creatures.js shape)
+      creature: null, // this wallet's first-owned Creature (lib/creatures.js shape)
       // Every Creature this wallet owns (creatures.js).
       collection: { status: 'idle', creatures: [] }, // status: 'idle' | 'loading' | 'ready' | 'error'
       // The Creature open at /creature/<id>, or this wallet's own at /creature
@@ -44,7 +47,7 @@
         notice: null, // what the last Feed or Train did: { kind, ... }
         error: null, // what the last Feed or Train could not do
       },
-      seed: null, // this wallet's Genesis Seed
+      seed: null, // this wallet's Genesis Seed waiting to be awakened
       // This wallet's Homestead and the Creature living in it (homestead.js,
       // lib/homestead.js shape). key is the wallet and Creature it was opened for.
       // work is its Work (lib/work.js overview shape); clockOffset is the

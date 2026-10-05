@@ -123,6 +123,9 @@
     });
     // Creature names: typed by their owners, so always set as text.
     var nameById = {};
+    (state.genesis.history || []).forEach(function (h) {
+      if (h.creatureId) nameById[h.creatureId] = h.creatureName;
+    });
     [state.creature, state.viewedCreature.creature, state.homestead.creature, state.viewedHomestead.creature].concat(state.collection.creatures).forEach(function (c) {
       if (c) nameById[c.creatureId] = c.name;
     });
@@ -223,7 +226,9 @@
       if (name === 'connect') wallet.connect(false);
       else if (name === 'disconnect') { walletMenuOpen = false; wallet.disconnect(); }
       else if (name === 'wallet-menu') { walletMenuOpen = !walletMenuOpen; render(); }
-      else if (name === 'genesis-mint') genesis.mint();
+      else if (name === 'genesis-mint') genesis.confirm();
+      else if (name === 'genesis-confirm') genesis.mint();
+      else if (name === 'genesis-cancel') genesis.cancelConfirm();
       else if (name === 'awaken') genesis.awaken();
       else if (name === 'genesis-retry') genesis.load();
       else if (name === 'stead-claim') stead.claim();

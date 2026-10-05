@@ -2,14 +2,16 @@
 //
 // Loaded by the page (<script src="/js/config.js">, as window.HOMESTEAD_CONFIG)
 // AND by the server (require('./public/js/config')), so both read the same
-// numbers. Every system that creates, counts or displays Creatures must read
-// MAX_CREATURE_SUPPLY from here; never write the number anywhere else.
+// numbers. There is no global Creature cap, and none may be added. A wallet
+// owns at most MAX_OWNED_CREATURES (lib/ownership.js), and each Genesis costs
+// GENESIS_COST STEAD (lib/genesis.js). Never write either number elsewhere.
 (function (root) {
   var config = Object.freeze({
-    // There can never be more than this many Creatures, ever.
-    MAX_CREATURE_SUPPLY: 5000,
-    // Each wallet will eventually get one Genesis opportunity (not built yet).
-    GENESIS_PER_WALLET: 1,
+    // The most Creatures one wallet can hold: those it owns now plus its
+    // Seeds still waiting to be awakened.
+    MAX_OWNED_CREATURES: 10,
+    // What one Genesis costs, in STEAD (a GENESIS ledger entry).
+    GENESIS_COST: 5000,
   });
 
   if (typeof module === 'object' && module.exports) module.exports = config;
