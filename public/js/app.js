@@ -4,20 +4,29 @@
   var wallet = window.HOMESTEAD_WALLET;
   var screens = window.HOMESTEAD_SCREENS;
   var genesis = window.HOMESTEAD_GENESIS;
+  var creatures = window.HOMESTEAD_CREATURES;
   var navEl = document.getElementById('nav');
   var walletEl = document.getElementById('wallet');
   var viewEl = document.getElementById('view');
   var walletMenuOpen = false;
 
+  // A Creature by id, /creature/<id>, belongs under MY CREATURE in the nav.
+  var CREATURE_PATH = /^\/creature\/(\d{1,9})$/;
+
   function currentRoute() {
     var path = window.location.pathname.replace(/\/+$/, '') || '/';
+    var m = CREATURE_PATH.exec(path);
+    if (m) {
+      var mine = screens.ROUTES.find(function (r) { return r.key === 'creature'; });
+      return { path: path, key: 'creatureById', label: 'CREATURE', nav: mine, creatureId: Number(m[1]) };
+    }
     return screens.ROUTES.find(function (r) { return r.path === path; }) || screens.ROUTES[0];
   }
 
   function renderNav(route) {
     navEl.innerHTML = screens.ROUTES.map(function (r) {
       return '<li><a href="' + r.path + '" data-nav class="nav-tab"' +
-        (r === route ? ' aria-current="page"' : '') + '>' +
+        (r === route || (r === route.nav && store.get().viewedCreature.ownedByYou) ? ' aria-current="page"' : '') + '>' +
         screens.icon(r.key, 'h-4 w-4') + r.label + '</a></li>';
     }).join('');
     var active = navEl.querySelector('[aria-current="page"]');
@@ -65,11 +74,27 @@
     document.querySelectorAll('[data-field]').forEach(function (el) {
       el.textContent = values[el.dataset.field] || '';
     });
+    // Creature names: typed by their owners, so always set as text.
+    var nameById = {};
+    [state.creature, state.viewedCreature.creature].concat(state.collection.creatures).forEach(function (c) {
+      if (c) nameById[c.creatureId] = c.name;
+    });
+    document.querySelectorAll('[data-creature-name]').forEach(function (el) {
+      el.textContent = nameById[el.dataset.creatureName] || '';
+    });
+  }
+
+  function creatureFor(id) {
+    var state = store.get();
+    if (state.viewedCreature.creature && state.viewedCreature.creature.creatureId === id) return state.viewedCreature.creature;
+    return state.creature && state.creature.creatureId === id ? state.creature : null;
   }
 
   function render() {
-    var state = store.get();
     var route = currentRoute();
+    // Starts the load (which re-renders) only when this Creature isn't showing.
+    if (route.creatureId) creatures.view(route.creatureId);
+    var state = store.get();
     document.title = route.label === 'HOME' || route.label === 'HOMESTEAD' ? 'HOMESTEAD' : route.label + ' · HOMESTEAD';
     renderNav(route);
     renderWallet(state);
@@ -102,6 +127,12 @@
       else if (name === 'genesis-mint') genesis.mint();
       else if (name === 'awaken') genesis.awaken();
       else if (name === 'genesis-retry') genesis.load();
+      else if (name === 'collection-retry') creatures.loadCollection();
+      else if (name === 'creature-retry') creatures.view(currentRoute().creatureId, true);
+      else if (name === 'rename') {
+        var holder = action.closest('[data-creature-id]');
+        creatures.openRename(holder && creatureFor(Number(holder.dataset.creatureId)));
+      }
       return;
     }
     // A tap anywhere else closes the wallet menu or dismisses its message.

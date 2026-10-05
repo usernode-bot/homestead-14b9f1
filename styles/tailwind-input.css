@@ -37,6 +37,27 @@
     --on-danger: 69 10 10;
     --focus: 217 249 157;     /* the keyboard focus ring */
     color-scheme: dark;
+
+    /* Creature artwork only (public/js/creature-art.js draws with these;
+       the names are listed in creature-config.js ART_COLORS). Never use
+       them for UI. */
+    --art-ink: 20 16 30;
+    --art-void: 40 32 58;
+    --art-slime: 124 222 92;
+    --art-toxic: 205 245 70;
+    --art-mint: 120 235 200;
+    --art-teal: 40 190 190;
+    --art-sky: 110 190 255;
+    --art-cobalt: 80 110 245;
+    --art-grape: 150 95 230;
+    --art-lilac: 200 165 255;
+    --art-bubblegum: 255 120 200;
+    --art-coral: 255 125 110;
+    --art-tangerine: 255 160 60;
+    --art-lemon: 255 225 80;
+    --art-rust: 205 105 65;
+    --art-bone: 244 236 218;
+    --art-ash: 150 145 172;
   }
   /* el.hidden = true hides an element even when a class gives it a display
      (flex, the components below). */
@@ -96,6 +117,20 @@
   .collectible::before {
     content: '';
     @apply pointer-events-none absolute inset-1.5 rounded-xl border border-dashed border-punk/40;
+  }
+
+  /* A modal dialog: <dialog class="dialog">, opened with showModal(). */
+  .dialog {
+    @apply m-auto w-11/12 max-w-sm rounded-2xl border-2 border-line bg-surface p-5 text-fg;
+  }
+  .dialog::backdrop {
+    background: rgb(var(--ground) / 0.75);
+  }
+
+  /* A rarity badge: <span class="rarity-badge"> plus the tier's badgeClass
+     from creature-config.js. */
+  .rarity-badge {
+    @apply inline-block rounded-md px-2 py-0.5 text-small font-black tracking-wide;
   }
 
   /* A sticker: a small tilted label slapped on a panel. */

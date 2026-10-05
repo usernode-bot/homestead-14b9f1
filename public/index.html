@@ -104,10 +104,33 @@
 
   <main id="view" class="mx-auto max-w-6xl px-4 pb-16 pt-6" style="padding-bottom: calc(4rem + var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px)))" tabindex="-1"></main>
 
+  <!-- Rename a Creature (creatures.js). Outside #view so a re-render never
+       closes it. Only the name changes. -->
+  <dialog id="rename-dialog" class="dialog" aria-labelledby="rename-title">
+    <form id="rename-form" novalidate>
+      <h2 id="rename-title" class="text-heading font-black">Rename Creature</h2>
+      <p class="mt-4 text-small text-muted">Current name</p>
+      <p id="rename-current" class="break-words text-body font-bold"></p>
+      <label for="rename-input" class="mt-4 block text-small text-muted">New name</label>
+      <input id="rename-input" class="field mt-1" type="text" autocomplete="off" spellcheck="false" aria-describedby="rename-hint rename-error">
+      <p id="rename-hint" class="mt-2 text-small text-muted">2 to 20 letters, numbers or spaces.</p>
+      <p id="rename-error" role="alert" class="mt-2 text-small text-danger" hidden></p>
+      <div class="mt-5 flex justify-end gap-2">
+        <button type="button" id="rename-cancel" class="btn-secondary">CANCEL</button>
+        <button type="submit" id="rename-save" class="btn-primary">SAVE</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="/js/config.js"></script>
+  <script src="/js/creature-config.js"></script>
+  <script src="/js/creature-name.js"></script>
   <script src="/js/state.js"></script>
   <script src="/js/wallet.js"></script>
   <script src="/js/genesis.js"></script>
+  <script src="/js/creatures.js"></script>
+  <script src="/js/creature-art.js"></script>
+  <script src="/js/creature-card.js"></script>
   <script src="/js/screens.js"></script>
   <script src="/js/app.js"></script>
 </body>
