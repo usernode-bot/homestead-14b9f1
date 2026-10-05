@@ -6,6 +6,7 @@
   var creatureConfig = window.HOMESTEAD_CREATURE_CONFIG;
   var cards = window.HOMESTEAD_CREATURE_CARD;
   var homesteadView = window.HOMESTEAD_HOMESTEAD_VIEW;
+  var steadConfig = window.HOMESTEAD_STEAD_CONFIG;
 
   function fmt(n) { return Number(n).toLocaleString('en-US'); }
 
@@ -17,6 +18,7 @@
     marketplace: '<path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
     collection: '<rect x="3" y="5" width="12" height="16" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v13"/>',
     profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   };
   function icon(name, cls) {
     return '<svg class="' + (cls || 'h-5 w-5') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
@@ -211,6 +213,126 @@
     '</div>';
   }
 
+  // ── STEAD Points ──────────────────────────────────────────────────────
+  // Every number below is what the server answered (lib/stead.js).
+  function steadAmount(n) { return steadConfig.format(n) + ' ' + steadConfig.NAME; }
+
+  // The 7 days of the cycle: claimed days ticked, today ringed, the rest
+  // waiting. day is today's cycle day (claimed or not).
+  function checkInStrip(c) {
+    var days = [];
+    for (var d = 1; d <= steadConfig.cycleLength(); d++) {
+      var done = c && (d < c.day || (d === c.day && c.claimedToday));
+      var today = c && d === c.day && !c.claimedToday;
+      var cls = done ? 'border-accent bg-accent text-on-accent'
+        : today ? 'border-accent text-fg'
+        : 'border-line text-muted';
+      days.push(
+        '<li class="flex min-h-14 flex-col items-center justify-center rounded-lg border-2 ' + cls + '" data-check-in-day="' + d + '" data-state="' + (done ? 'claimed' : today ? 'today' : 'waiting') + '">' +
+          (done ? icon('check', 'h-5 w-5') + '<span class="sr-only">Day ' + d + ' claimed</span>'
+            : '<span class="text-body font-black tabular-nums"><span class="sr-only">Day </span>' + d + '</span>') +
+          '<span class="text-small font-bold tabular-nums' + (done ? '' : ' text-muted') + '" aria-hidden="true">' + steadConfig.format(steadConfig.rewardFor(d)) + '</span>' +
+        '</li>'
+      );
+    }
+    return '<ol class="mt-4 grid grid-cols-7 gap-1.5" aria-label="Seven day streak">' + days.join('') + '</ol>';
+  }
+
+  function checkInCard(state) {
+    var s = state.stead;
+    var connected = state.wallet.status === 'connected';
+    var head = '<span class="sticker absolute -top-3 left-4">7 DAY STREAK</span>' +
+      '<h2 class="text-title font-black tracking-tight">DAILY CHECK-IN</h2>';
+    if (!connected) {
+      return '<section class="collectible" id="daily-check-in" data-check-in="connect">' + head +
+        '<p class="mt-1 text-body text-muted">Earn STEAD every day you check in.</p>' +
+        checkInStrip(null) +
+        '<p class="mt-4 text-small text-muted">Connect your wallet to check in.</p>' +
+      '</section>';
+    }
+    if (s.status === 'error') {
+      return '<section class="collectible state-error" id="daily-check-in" data-check-in="error">' +
+        '<p class="text-heading">Couldn\'t load your Daily Check-in.</p>' +
+        '<p class="max-w-sm text-body text-muted">Your STEAD is safe. Check your connection and try again.</p>' +
+        '<button type="button" class="btn-secondary mt-2" data-action="stead-retry">Retry</button>' +
+      '</section>';
+    }
+    var c = s.checkIn;
+    if (s.status !== 'ready' || !c) {
+      return '<section class="collectible" id="daily-check-in" aria-busy="true">' +
+        '<span class="sr-only">Loading your Daily Check-in</span>' +
+        '<div class="skeleton h-7 w-48"></div>' +
+        '<div class="skeleton mt-4 h-14"></div>' +
+        '<div class="skeleton mt-4 h-11 w-36"></div>' +
+      '</section>';
+    }
+    var busy = s.pending === 'claim';
+    var today = '<p class="text-small font-bold text-muted">TODAY · DAY ' + c.day + '</p>' +
+      '<p class="text-heading font-black tabular-nums" data-check-in-reward="' + c.reward + '">+' + steadAmount(c.reward) + '</p>';
+    var action = c.claimedToday
+      ? '<div data-check-in-claimed>' +
+          '<p class="flex items-center gap-1.5 text-body font-black text-accent" role="status">' + icon('check', 'h-5 w-5') + 'CLAIMED TODAY</p>' +
+          '<p class="text-body text-muted">Come back tomorrow.</p>' +
+          '<p class="mt-2 text-small text-muted">Next reward: <span class="font-bold text-fg">Day ' + c.nextDay + ', ' + steadAmount(c.nextReward) + '</span></p>' +
+        '</div>'
+      : '<button type="button" class="btn-primary w-full sm:w-auto sm:min-w-36" data-action="stead-claim"' + (busy ? ' disabled' : '') + '>' +
+          (busy ? 'CLAIMING…' : 'CLAIM') +
+        '</button>';
+    return '<section class="collectible" id="daily-check-in" data-check-in="' + (c.claimedToday ? 'claimed' : 'claimable') + '">' + head +
+      checkInStrip(c) +
+      '<div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">' +
+        '<div>' + today + '</div>' +
+        action +
+      '</div>' +
+      (s.error ? '<p role="alert" class="mt-3 text-small text-danger" data-field="stead-error"></p>' : '') +
+      '<p class="mt-4 text-small text-muted">Current streak: <span class="font-bold text-fg" data-check-in-streak="' + c.currentStreak + '">' + c.currentStreak + (c.currentStreak === 1 ? ' day' : ' days') + '</span>. A new day starts at midnight ' + c.timezone + '.</p>' +
+    '</section>';
+  }
+
+  // "Oct 05": the game day a check-in was for, else the entry's date in the
+  // game timezone.
+  function steadEntryDate(e) {
+    var tz = steadConfig.GAME_TIMEZONE;
+    var d = e.metadata && /^\d{4}-\d{2}-\d{2}$/.test(e.metadata.claimDate || '')
+      ? new Date(e.metadata.claimDate + 'T12:00:00Z') : new Date(e.timestamp);
+    return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', timeZone: e.metadata && e.metadata.claimDate ? 'UTC' : tz });
+  }
+
+  function steadHistory(state) {
+    var s = state.stead;
+    var heading = '<h2 class="section-label mt-8">STEAD History</h2>';
+    if (s.status === 'error') {
+      return heading + '<div class="list"><div class="state-error">' +
+        '<p class="text-body">Couldn\'t load your STEAD History.</p>' +
+        '<button type="button" class="btn-secondary" data-action="stead-retry">Retry</button>' +
+      '</div></div>';
+    }
+    if (s.status !== 'ready') {
+      return heading + '<ul class="list" aria-busy="true"><li class="list-row"><span class="sr-only">Loading STEAD History</span><div class="skeleton h-5 w-full"></div></li><li class="list-row"><div class="skeleton h-5 w-full"></div></li></ul>';
+    }
+    if (!s.ledger.length) {
+      return heading + '<div class="list"><div class="state-empty" data-empty="stead-history">' +
+        '<p class="text-heading">No STEAD yet.</p>' +
+        '<p class="max-w-sm text-body text-muted">Claim your Daily Check-in on Home to earn your first STEAD.</p>' +
+        '<a href="/" data-nav class="btn-secondary mt-2">Go to Daily Check-in</a>' +
+      '</div></div>';
+    }
+    return heading + '<ul class="list" data-stead-history>' + s.ledger.map(function (e) {
+      return '<li class="list-row justify-between" data-stead-entry="' + Number(e.id) + '" data-type="' + e.type + '">' +
+        '<span class="min-w-0"><span class="block font-bold">' + (steadConfig.type(e.type) || { label: 'STEAD' }).label + '</span>' +
+          '<span class="block text-small text-muted">' + steadEntryDate(e) + ' · Balance ' + steadConfig.format(e.balanceAfter) + '</span></span>' +
+        '<span class="shrink-0 font-black tabular-nums' + (e.amount > 0 ? ' text-accent' : '') + '">' + steadConfig.formatSigned(e.amount) + '</span>' +
+      '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function profileStead(state) {
+    var s = state.stead;
+    if (s.status === 'error') return "Couldn't load";
+    if (s.status !== 'ready' || s.steadBalance == null) return 'Loading…';
+    return '<span class="font-black tabular-nums" data-profile-stead="' + s.steadBalance + '">' + steadAmount(s.steadBalance) + '</span>';
+  }
+
   function home(state) {
     var max = config.MAX_CREATURE_SUPPLY;
     return '' +
@@ -227,6 +349,7 @@
         '<div class="md:col-span-2">' + supplyCard(state) + '</div>' +
       '</section>' +
       '<div class="mt-4 max-w-2xl">' + genesisPanel(state) + '</div>' +
+      '<div class="mt-10 max-w-2xl">' + checkInCard(state) + '</div>' +
       '<section class="mt-10 max-w-2xl">' +
         '<h2 class="section-label">About the game</h2>' +
         '<ul class="list">' +
@@ -417,13 +540,15 @@
           '<li class="list-row justify-between"><span class="text-muted">Player</span><span class="font-bold" data-field="username"></span></li>' +
           '<li class="list-row justify-between gap-4"><span class="text-muted">Wallet</span><span class="min-w-0 break-all text-right font-mono text-small" data-field="address"></span></li>' +
           '<li class="list-row justify-between"><span class="text-muted">Genesis</span><span>' + profileGenesis(state) + '</span></li>' +
+          '<li class="list-row justify-between"><span class="text-muted">STEAD Balance</span><span>' + profileStead(state) + '</span></li>' +
           '<li class="list-row justify-between"><span class="text-muted">Creature</span><span>' +
             (ownsGenesisCreature(state)
               ? '<a href="/creature" data-nav class="font-bold underline decoration-punk underline-offset-4">' + cards.nameSpan(state.creature) + '</a> <span class="font-mono text-small text-muted">' + cards.formatId(state.creature.creatureId) + '</span>'
               : 'No Creature yet.') +
           '</span></li>' +
         '</ul>' +
-        '<button type="button" class="btn-secondary mt-4" data-action="disconnect">Disconnect wallet</button>' +
+        steadHistory(state) +
+        '<button type="button" class="btn-secondary mt-6" data-action="disconnect">Disconnect wallet</button>' +
       '</section>';
   }
 

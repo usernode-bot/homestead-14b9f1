@@ -6,6 +6,7 @@ const genesis = require('./lib/genesis');
 const creatures = require('./lib/creatures');
 const homestead = require('./lib/homestead');
 const work = require('./lib/work');
+const stead = require('./lib/stead');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -185,7 +186,7 @@ function genesisWallet(req) {
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -352,6 +353,30 @@ app.post('/api/work/collect-pending', async (req, res) => {
   }
 });
 
+// STEAD Points and Daily Check-in (lib/stead.js). Always for the wallet the
+// platform's verified token links to this account, never one the browser
+// names, and every calendar day comes from the server's clock (req.now) in
+// the game timezone. No wallet: no balance, and no anonymous account.
+app.get('/api/stead', async (req, res) => {
+  try {
+    res.json(await stead.getState(pool, genesisWallet(req), req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// One claim per wallet per calendar day: a second one (double click, another
+// tab, a retry) is refused with already_claimed and pays nothing.
+app.post('/api/stead/check-in', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  try {
+    res.json(await stead.claimCheckIn(pool, wallet, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // HTML shell: serve the app if authenticated. Unauthenticated top-level
@@ -451,6 +476,7 @@ async function start() {
   if (filled) console.log(`[creatures] filled in ${filled} earlier Creature(s)`);
   await homestead.ensureSchema(pool);
   await work.ensureSchema(pool);
+  await stead.ensureSchema(pool);
   if (IS_STAGING) await seedStaging().catch((err) => console.warn('[staging seed]', err.message));
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.

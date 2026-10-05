@@ -6,8 +6,11 @@
   var genesis = window.HOMESTEAD_GENESIS;
   var creatures = window.HOMESTEAD_CREATURES;
   var homesteads = window.HOMESTEAD_HOMESTEADS;
+  var stead = window.HOMESTEAD_STEAD;
+  var steadConfig = window.HOMESTEAD_STEAD_CONFIG;
   var navEl = document.getElementById('nav');
   var walletEl = document.getElementById('wallet');
+  var steadEl = document.getElementById('stead-balance');
   var viewEl = document.getElementById('view');
   var walletMenuOpen = false;
 
@@ -69,6 +72,18 @@
     }
   }
 
+  // The STEAD balance in the header: the connected wallet's, as the server
+  // last answered it, or "—" with no wallet (there is no anonymous balance).
+  function renderStead(state) {
+    var s = state.stead;
+    var known = state.wallet.status === 'connected' && s.status === 'ready' && s.steadBalance != null;
+    var value = known ? steadConfig.format(s.steadBalance) : '—';
+    steadEl.setAttribute('aria-label', known ? value + ' ' + steadConfig.LONG_NAME + '. Open STEAD History' : steadConfig.LONG_NAME + ': no wallet connected');
+    steadEl.innerHTML =
+      '<span class="text-small font-bold text-punk">' + steadConfig.NAME + '</span>' +
+      '<span class="text-small font-black tabular-nums" data-stead-balance="' + (known ? s.steadBalance : '') + '">' + value + '</span>';
+  }
+
   // Text a person owns goes in as text, never as HTML.
   function fillFields(state) {
     var w = state.wallet;
@@ -79,6 +94,7 @@
       error: w.error || '',
       'genesis-error': state.genesis.error || '',
       'work-error': state.homestead.error || '',
+      'stead-error': state.stead.error || '',
     };
     document.querySelectorAll('[data-field]').forEach(function (el) {
       el.textContent = values[el.dataset.field] || '';
@@ -111,6 +127,7 @@
     document.title = route.label === 'HOME' || route.label === 'HOMESTEAD' ? 'HOMESTEAD' : route.label + ' · HOMESTEAD';
     renderNav(route);
     renderWallet(state);
+    renderStead(state);
     viewEl.innerHTML = screens.render[route.key](state, route);
     fillFields(state);
   }
@@ -140,6 +157,8 @@
       else if (name === 'genesis-mint') genesis.mint();
       else if (name === 'awaken') genesis.awaken();
       else if (name === 'genesis-retry') genesis.load();
+      else if (name === 'stead-claim') stead.claim();
+      else if (name === 'stead-retry') stead.load();
       else if (name === 'collection-retry') creatures.loadCollection();
       else if (name === 'creature-retry') creatures.view(currentRoute().creatureId, true);
       else if (name === 'homestead-retry') { if (store.get().genesis.status === 'error') genesis.load(); else homesteads.open(true); }

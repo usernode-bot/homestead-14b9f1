@@ -34,6 +34,18 @@
       "expectText": "GENESIS MINT"
     },
     {
+      "name": "Home shows the Daily Check-in seven day schedule",
+      "path": "/",
+      "expectSelector": "#daily-check-in [data-check-in-day=\"7\"]",
+      "expectText": "DAILY CHECK-IN"
+    },
+    {
+      "name": "The header shows STEAD with no balance until a wallet connects",
+      "path": "/",
+      "expectSelector": "#stead-balance [data-stead-balance=\"\"]",
+      "expectText": "STEAD"
+    },
+    {
       "name": "My Creature placeholder",
       "path": "/creature",
       "expectSelector": "[data-empty=\"creature\"]",
