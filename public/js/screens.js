@@ -5,6 +5,7 @@
   var config = window.HOMESTEAD_CONFIG;
   var creatureConfig = window.HOMESTEAD_CREATURE_CONFIG;
   var cards = window.HOMESTEAD_CREATURE_CARD;
+  var homesteadView = window.HOMESTEAD_HOMESTEAD_VIEW;
 
   function fmt(n) { return Number(n).toLocaleString('en-US'); }
 
@@ -248,8 +249,74 @@
       ? 'Your Seed is still dormant. Awaken it on Home.'
       : 'Use Genesis on Home to create a Seed, then awaken it into your Creature.');
   }
+  function homesteadLoading() {
+    return '<div class="max-w-3xl" aria-busy="true"><span class="sr-only">Loading your Homestead</span>' +
+      '<section class="collectible">' +
+        '<div class="flex items-end justify-between gap-4 pb-4 pt-2"><div class="skeleton h-9 w-32"></div><div class="skeleton h-9 w-20"></div></div>' +
+        '<div class="skeleton h-64 rounded-xl sm:h-80"></div>' +
+        '<div class="skeleton mx-auto mt-4 h-9 w-40"></div>' +
+      '</section>' +
+      '<div class="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-3"><div class="skeleton h-40 rounded-xl"></div><div class="skeleton h-40 rounded-xl"></div><div class="skeleton h-40 rounded-xl"></div></div>' +
+    '</div>';
+  }
+
+  // This wallet's Homestead: connect first; then waiting for a Creature, or
+  // the whole Homestead with its Creature at home.
   function homestead(state, route) {
-    return placeholder(route, 'Your Homestead is waiting for its Creature.', 'Once you have a Creature, this is where it will make its home.');
+    var w = state.wallet;
+    if (w.status === 'disconnected') {
+      return pageHeading(route) +
+        '<section class="collectible state-empty max-w-3xl py-14" data-empty="homestead">' +
+          '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon('homestead', 'h-8 w-8') + '</span>' +
+          '<p class="text-heading font-black">CONNECT HOMEROOM WALLET</p>' +
+          '<p class="max-w-sm text-body text-muted">Your Homestead belongs to the wallet linked to your Homeroom account.</p>' +
+          '<button type="button" class="btn-secondary mt-2" data-action="connect">CONNECT WALLET</button>' +
+        '</section>';
+    }
+    var h = state.homestead;
+    if (w.status === 'connected' && (state.genesis.status === 'error' || h.status === 'error')) {
+      return pageHeading(route) +
+        '<section class="collectible state-error max-w-3xl">' +
+          '<p class="text-heading">Couldn\'t load your Homestead.</p>' +
+          '<p class="max-w-sm text-body text-muted">Your Creature is safe. Check your connection and try again.</p>' +
+          '<button type="button" class="btn-secondary mt-2" data-action="homestead-retry">Retry</button>' +
+        '</section>';
+    }
+    if (w.status !== 'connected' || h.status !== 'ready') return pageHeading(route) + homesteadLoading();
+    if (!h.homestead || !h.creature) {
+      return pageHeading(route) +
+        '<section class="collectible state-empty max-w-3xl py-14" data-empty="homestead-waiting">' +
+          '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon('homestead', 'h-8 w-8') + '</span>' +
+          '<p class="text-heading font-black">YOUR HOMESTEAD IS WAITING</p>' +
+          '<p class="max-w-sm text-body text-muted">Awaken your Genesis Creature to move in.</p>' +
+          '<a href="/" data-nav class="btn-secondary mt-2">Go to Genesis</a>' +
+        '</section>';
+    }
+    return pageHeading(route) + homesteadView.page(h.homestead, h.creature);
+  }
+
+  // A Homestead by its number, /homestead/<id>: anyone can look.
+  function homesteadById(state, route) {
+    var v = state.viewedHomestead;
+    var heading = pageHeading(route.nav || route);
+    if (v.status === 'ready' && v.homestead) return heading + homesteadView.page(v.homestead, v.creature);
+    if (v.status === 'missing') {
+      return heading +
+        '<section class="collectible state-empty max-w-3xl py-14" data-empty="homestead-missing">' +
+          '<p class="text-heading">No Homestead has that number.</p>' +
+          '<p class="max-w-sm text-body text-muted">Its owner may not have moved in yet.</p>' +
+          '<a href="/homestead" data-nav class="btn-secondary mt-2">Go to my Homestead</a>' +
+        '</section>';
+    }
+    if (v.status === 'error') {
+      return heading +
+        '<section class="collectible state-error max-w-3xl">' +
+          '<p class="text-heading">Couldn\'t load this Homestead.</p>' +
+          '<p class="max-w-sm text-body text-muted">Check your connection and try again.</p>' +
+          '<button type="button" class="btn-secondary mt-2" data-action="homestead-view-retry">Retry</button>' +
+        '</section>';
+    }
+    return heading + homesteadLoading();
   }
   function marketplace(state, route) {
     return placeholder(route, 'No Creatures listed yet.', 'Trading opens in a future update.');
@@ -358,6 +425,6 @@
   window.HOMESTEAD_SCREENS = {
     ROUTES: ROUTES,
     icon: icon,
-    render: { home: home, creature: creature, creatureById: creatureById, homestead: homestead, marketplace: marketplace, collection: collection, profile: profile },
+    render: { home: home, creature: creature, creatureById: creatureById, homestead: homestead, homesteadById: homesteadById, marketplace: marketplace, collection: collection, profile: profile },
   };
 })();
