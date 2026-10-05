@@ -58,6 +58,12 @@
       "expectText": "CONNECT HOMEROOM WALLET"
     },
     {
+      "name": "Gear asks to connect a wallet",
+      "path": "/gear",
+      "expectSelector": "[data-empty=\"gear\"] [data-action=\"connect\"]",
+      "expectText": "Connect your wallet to see your Gear."
+    },
+    {
       "id": "homestead.view",
       "name": "A Homestead shows its level, Creature, locked buildings and empty storage",
       "path": "/homestead/900001",
@@ -137,7 +143,9 @@
         "lib/creature*.js",
         "styles/**",
         "public/js/care-config.js",
-        "lib/care.js"
+        "lib/care.js",
+        "public/js/gear*.js",
+        "lib/gear.js"
       ]
     },
     {
@@ -157,6 +165,18 @@
       "path": "/creature/1",
       "expectSelector": "[data-creature-profile] [data-training] [data-effective-stat=\"attack\"]",
       "expectText": "Effective"
+    },
+    {
+      "name": "A Creature's profile shows its Gear slots",
+      "path": "/creature/1",
+      "expectSelector": "[data-creature-profile] [data-gear-section] [data-gear-slot=\"tool\"] ~ [data-gear-slot=\"accessory\"]",
+      "expectText": "ACCESSORY"
+    },
+    {
+      "name": "A Creature's profile shows the Gear layer of every stat",
+      "path": "/creature/1",
+      "expectSelector": "[data-creature-profile] [data-training-stat=\"luck\"] [data-gear-bonus=\"luck\"]",
+      "expectText": "Gear"
     },
     {
       "name": "An unknown Creature ID shows not found",

@@ -7,6 +7,7 @@
   var cards = window.HOMESTEAD_CREATURE_CARD;
   var homesteadView = window.HOMESTEAD_HOMESTEAD_VIEW;
   var steadConfig = window.HOMESTEAD_STEAD_CONFIG;
+  var gearView = window.HOMESTEAD_GEAR_VIEW;
 
   function fmt(n) { return Number(n).toLocaleString('en-US'); }
 
@@ -19,6 +20,7 @@
     collection: '<rect x="3" y="5" width="12" height="16" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v13"/>',
     profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    gear: '<path d="M8 7V5a4 4 0 0 1 8 0v2"/><rect x="4" y="7" width="16" height="14" rx="3"/><path d="M9 13h6"/>',
   };
   function icon(name, cls) {
     return '<svg class="' + (cls || 'h-5 w-5') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
@@ -363,11 +365,11 @@
   }
 
   // The profile options for the Creature open in viewedCreature: its owner
-  // can rename, feed and train it.
-  function profileOpts(v, mine) {
+  // can rename, feed, train and change its Gear.
+  function profileOpts(state, v, mine) {
     return {
       canRename: mine, canAct: mine, controls: v.controls,
-      pending: v.pending, notice: v.notice, error: v.error,
+      pending: v.pending, notice: v.notice, error: v.error, gear: state.gear,
     };
   }
 
@@ -378,9 +380,9 @@
       // until then it shows with those controls waiting.
       var v = state.viewedCreature;
       if (v.id === c.creatureId && v.status === 'ready' && v.creature) {
-        return pageHeading(route) + cards.profile(v.creature, profileOpts(v, v.ownedByYou));
+        return pageHeading(route) + cards.profile(v.creature, profileOpts(state, v, v.ownedByYou));
       }
-      return pageHeading(route) + cards.profile(c, { canRename: true, canAct: true, controls: null });
+      return pageHeading(route) + cards.profile(c, { canRename: true, canAct: true, controls: null, gear: state.gear });
     }
     var hasSeed = state.wallet.status === 'connected' && state.seed && !c;
     return placeholder(route, 'No Creature yet.', hasSeed
@@ -432,7 +434,30 @@
     }
     return pageHeading(route) + homesteadView.page(h.homestead, h.creature, {
       work: h.work, canAct: true, pending: h.pending, error: h.error, scope: 'own', clockOffset: h.clockOffset,
-    });
+    }) +
+      '<section class="mt-8 max-w-3xl">' +
+        '<h2 class="section-label">Gear</h2>' +
+        '<ul class="list"><li><a href="/gear" data-nav class="list-row justify-between hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus" data-gear-link>' +
+          '<span class="flex items-center gap-3">' + icon('gear', 'h-5 w-5 shrink-0 text-punk') + '<span class="font-bold">Gear inventory</span></span>' +
+          '<span class="text-small text-muted">Open</span>' +
+        '</a></li></ul>' +
+      '</section>';
+  }
+
+  // The Gear inventory, /gear: this wallet's Gear, equipped or not. EQUIP puts
+  // Gear on the wallet's own Creature.
+  function gear(state, route) {
+    var heading = pageHeading(route);
+    if (state.wallet.status !== 'connected') {
+      return heading +
+        '<section class="collectible state-empty max-w-3xl py-14" data-empty="gear">' +
+          '<span class="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-line text-muted">' + icon('gear', 'h-8 w-8') + '</span>' +
+          '<p class="text-heading">Connect your wallet to see your Gear.</p>' +
+          '<p class="max-w-sm text-body text-muted">Gear belongs to the wallet linked to your Homeroom account.</p>' +
+          (state.wallet.status === 'connecting' ? '' : '<button type="button" class="btn-secondary mt-2" data-action="connect">CONNECT WALLET</button>') +
+        '</section>';
+    }
+    return heading + gearView.inventory(state, ownsGenesisCreature(state) ? state.creature : null);
   }
 
   // A Homestead by its number, /homestead/<id>: anyone can look.
@@ -470,7 +495,7 @@
     var v = state.viewedCreature;
     var mine = v.status === 'ready' && v.ownedByYou && state.wallet.status === 'connected';
     var heading = pageHeading(mine ? route : { key: 'creature', label: 'CREATURE' });
-    if (v.status === 'ready' && v.creature) return heading + cards.profile(v.creature, profileOpts(v, mine));
+    if (v.status === 'ready' && v.creature) return heading + cards.profile(v.creature, profileOpts(state, v, mine));
     if (v.status === 'missing') {
       return heading +
         '<section class="collectible state-empty py-14" data-empty="creature-missing">' +
@@ -570,6 +595,6 @@
   window.HOMESTEAD_SCREENS = {
     ROUTES: ROUTES,
     icon: icon,
-    render: { home: home, creature: creature, creatureById: creatureById, homestead: homestead, homesteadById: homesteadById, marketplace: marketplace, collection: collection, profile: profile },
+    render: { home: home, gear: gear, creature: creature, creatureById: creatureById, homestead: homestead, homesteadById: homesteadById, marketplace: marketplace, collection: collection, profile: profile },
   };
 })();

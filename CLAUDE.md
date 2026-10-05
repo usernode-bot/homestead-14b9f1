@@ -82,8 +82,9 @@ PR #1 built the foundation: navigation, the wallet area, the Home screen and
 placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). PR #3 made
 the Creature a full collectible (below). PR #4 added the Homestead; PR #5 Work
 & Resources (below); PR #6 STEAD Points and Daily Check-in (below); PR #7
-Feeding + Training (below). Listings, breeding, Gear, other STEAD spending and
-transactions do not exist yet, and none may be faked.
+Feeding + Training (below); PR #8 Gear (below). Listings, breeding, Gear
+crafting or trading, other STEAD spending and transactions do not exist yet,
+and none may be faked.
 
 - **Genesis:** `lib/genesis.js` holds every rule, enforced in Postgres
   transactions: one Genesis per wallet (`genesis_wallets.genesis_used`, which
@@ -137,6 +138,17 @@ transactions do not exist yet, and none may be faked.
   gear 0 + traits 0) is the one stat calculation. Work stores the hunger
   efficiency at its start and rounds each Resource down. Every value and
   calculation is in `public/js/care-config.js`.
+- **Gear:** `lib/gear.js` owns it: one `gear_items` row per item (permanent
+  id shown as GEAR-001, its name, rarity, type, stats and trait copied from the
+  catalog and never changed, never deleted), owned by a wallet and on at most
+  one Creature (`equipped_creature_id`; a unique index allows one item per
+  Creature and slot; a trigger refuses Gear on a Creature its owner doesn't
+  own). Equip, replace and unequip are one transaction each under a lock on
+  the Creature, free (no STEAD, no ledger entry), and repeat safely. The slots
+  are Tool and Accessory: Homeroom's content rules allow no weapons, so there
+  is no Weapon slot. Gear comes only from the once-per-wallet starter kit for
+  now. Slots, stats and the catalog are only in `public/js/gear-config.js`;
+  care-config.js `gearBonus` adds equipped Gear into `effectiveStat`.
 - **Supply cap:** there can never be more than 5,000 Creatures.
   `MAX_CREATURE_SUPPLY` in `public/js/config.js` is the only place that number
   is written. The page reads it as `window.HOMESTEAD_CONFIG`, the server as
@@ -152,7 +164,8 @@ transactions do not exist yet, and none may be faked.
   it falls back to a random mock address.
 - **Screens:** `public/js/screens.js` (one render function per route),
   `public/js/app.js` (router, nav, wallet area). Routes are clean paths
-  (`/`, `/creature`, `/homestead`, `/marketplace`, `/collection`, `/profile`);
+  (`/`, `/creature`, `/homestead`, `/marketplace`, `/collection`, `/profile`,
+  and `/gear` under HOMESTEAD);
   the server's catch-all serves `index.html` for each.
 - **Content rules:** Homeroom apps may not include combat or fantasy violence,
   so head-to-head play is called "compete"/"contests", not battles. Design it

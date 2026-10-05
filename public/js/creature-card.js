@@ -5,9 +5,10 @@
 // - hero(c, opts): the large panel at the top of a Creature's profile.
 // - statsList(c) / identityList(c): the base stats and the permanent identity.
 // - feedingSection(c, opts) / trainingSection(c, opts): hunger and condition
-//   with the owner's FEED control; base, training and effective stats with
-//   the owner's TRAIN controls. Every number comes from the server; the costs
-//   and limits are read from care-config.js.
+//   with the owner's FEED control; base, training, Gear and effective stats
+//   with the owner's TRAIN controls. Every number comes from the server; the
+//   costs and limits are read from care-config.js. The Gear section itself is
+//   gear-view.js.
 //
 // The name is the one thing a person types, so it is never written into this
 // HTML: each place it shows is a <span data-creature-name="<id>">, filled in
@@ -167,12 +168,13 @@
     return '<section data-hunger-section><h3 class="section-label">Hunger</h3><ul class="list">' + rows + '</ul></section>';
   }
 
-  // Base, training and effective stats; for the owner a TRAIN button on each.
-  // data-stat keeps the base value. opts as feedingSection.
+  // Base, training, Gear and effective stats; for the owner a TRAIN button on
+  // each. data-stat keeps the base value. opts as feedingSection.
   function trainingSection(c, opts) {
     opts = opts || {};
     var ctl = opts.canAct ? opts.controls : null;
     var bonus = c.trainingBonus || {};
+    var gearBonus = care.gearBonuses(c);
     var effective = care.effectiveStats(c);
     var working = !!(ctl && ctl.working);
     var poor = !!(ctl && Number(ctl.steadBalance) < care.TRAINING_COST);
@@ -191,6 +193,7 @@
     var rows = cfg.STATS.map(function (s) {
       var base = Number(c.stats && c.stats[s.key]) || 0;
       var b = Number(bonus[s.key]) || 0;
+      var gb = Number(gearBonus[s.key]) || 0;
       var atMax = b >= care.MAX_TRAINING_BONUS;
       var button = '';
       if (opts.canAct) {
@@ -202,9 +205,10 @@
       }
       return '<li class="list-row flex-wrap gap-x-4 gap-y-2" data-training-stat="' + s.key + '">' +
         '<span class="w-20 shrink-0 text-small font-bold">' + s.label.toUpperCase() + '</span>' +
-        '<dl class="grid flex-1 grid-cols-3 gap-2 text-small">' +
+        '<dl class="grid min-w-60 flex-1 grid-cols-4 gap-2 text-small">' +
           '<div><dt class="text-muted">Base</dt><dd class="font-bold tabular-nums" data-stat="' + s.key + '">' + base + '</dd></div>' +
           '<div><dt class="text-muted">Training</dt><dd class="font-bold tabular-nums" data-training-bonus="' + s.key + '">+' + b + '</dd></div>' +
+          '<div><dt class="text-muted">Gear</dt><dd class="tabular-nums' + (gb ? ' font-bold' : ' text-muted') + '" data-gear-bonus="' + s.key + '">+' + gb + '</dd></div>' +
           '<div><dt class="text-muted">Effective</dt><dd class="text-body font-black tabular-nums" data-effective-stat="' + s.key + '">' + effective[s.key] + '</dd></div>' +
         '</dl>' +
         button +
@@ -212,12 +216,14 @@
     }).join('');
     return '<section data-training><h3 class="section-label">' + (opts.canAct ? 'Stats and training' : 'Stats') + '</h3>' +
       '<ul class="list" data-stats>' + head + rows + '</ul>' +
-      (opts.canAct ? '<p class="mt-2 px-1 text-small text-muted">Each stat can gain up to +' + care.MAX_TRAINING_BONUS + ' from training. Base stats never change.</p>' : '') +
+      '<p class="mt-2 px-1 text-small text-muted">Effective is Base plus Training plus Gear.' +
+        (opts.canAct ? ' Each stat can gain up to +' + care.MAX_TRAINING_BONUS + ' from training. Base stats never change.' : '') + '</p>' +
     '</section>';
   }
 
-  // The whole profile: hero; hunger and identity side by side; then stats
-  // and training. opts: { canRename, canAct, controls, pending, notice, error }
+  // The whole profile: hero; hunger and identity side by side; Gear; then
+  // stats and training.
+  // opts: { canRename, canAct, controls, pending, notice, error, gear }
   function profile(c, opts) {
     opts = opts || {};
     return '<div class="max-w-3xl" data-creature-profile="' + Number(c.creatureId) + '">' +
@@ -227,6 +233,7 @@
         feedingSection(c, opts) +
         '<section><h3 class="section-label">Identity</h3>' + identityList(c) + '</section>' +
       '</div>' +
+      '<div class="mt-8">' + window.HOMESTEAD_GEAR_VIEW.section(c, { canAct: opts.canAct, gear: opts.gear }) + '</div>' +
       '<div class="mt-8">' + trainingSection(c, opts) + '</div>' +
     '</div>';
   }

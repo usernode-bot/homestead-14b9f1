@@ -71,7 +71,7 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query(`DROP TABLE IF EXISTS creature_care_log, stead_ledger, stead_accounts, creature_work,
+    await pool.query(`DROP TABLE IF EXISTS gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts, creature_work,
       homestead_buildings, homesteads, creatures, seeds, genesis_wallets, creature_supply CASCADE`);
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);

@@ -97,13 +97,31 @@
     return Math.max(0, Math.floor(Number(amount) * eff + 1e-9));
   }
 
-  // Bonuses from systems that do not exist yet. Gear and Traits will return
-  // their own per-stat bonuses here; until then they add nothing.
-  function gearBonus(/* creature, statKey */) { return 0; }
+  // What the Creature's equipped Gear adds to one stat: the sum of that stat
+  // over every item in creature.gear ({ tool, accessory }, each a Gear item
+  // or null; lib/gear.js shape). No Gear adds 0.
+  function gearBonus(creature, key) {
+    var gear = creature && creature.gear;
+    if (!gear) return 0;
+    var sum = 0;
+    Object.keys(gear).forEach(function (slot) {
+      var item = gear[slot];
+      sum += Number(item && item.stats && item.stats[key]) || 0;
+    });
+    return sum;
+  }
+  // Traits do not exist yet: they add nothing.
   function traitBonus(/* creature, statKey */) { return 0; }
 
+  function gearBonuses(creature) {
+    var out = {};
+    TRAINABLE_STATS.forEach(function (key) { out[key] = gearBonus(creature, key); });
+    return out;
+  }
+
   // The one effective-stat calculation: base + training + gear + traits.
-  // `creature` has stats (base) and trainingBonus.
+  // `creature` has stats (base), trainingBonus and gear. Base stats and
+  // training bonuses are only read, never changed, by Gear.
   function effectiveStat(creature, key) {
     var base = Number(creature && creature.stats && creature.stats[key]) || 0;
     var training = Number(creature && creature.trainingBonus && creature.trainingBonus[key]) || 0;
@@ -140,6 +158,8 @@
     condition: condition,
     efficiency: efficiency,
     applyEfficiency: applyEfficiency,
+    gearBonus: gearBonus,
+    gearBonuses: gearBonuses,
     effectiveStat: effectiveStat,
     effectiveStats: effectiveStats,
     isTrainable: isTrainable,
