@@ -13,6 +13,7 @@ const homestead = require('../lib/homestead');
 const work = require('../lib/work');
 const stead = require('../lib/stead');
 const care = require('../lib/care');
+const marketplace = require('../lib/marketplace');
 
 const HOUR = 3600 * 1000;
 
@@ -72,7 +73,7 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
   t.after(() => pool.end());
 
   async function reset() {
-    await pool.query(`DROP TABLE IF EXISTS contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts, creature_work,
+    await pool.query(`DROP TABLE IF EXISTS food_inventory, contest_creature_locks, contests, contest_challenges, gear_starter_claims, gear_items, creature_care_log, stead_ledger, stead_accounts, creature_work,
       homestead_buildings, homesteads, creatures, seeds, genesis_wallets CASCADE`);
     await genesis.ensureSchema(pool);
     await homestead.ensureSchema(pool);
@@ -196,6 +197,66 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
     assert.strictEqual(cfg.currentHunger(row.hunger, row.hunger_updated_at, at(30)), 40);
     // Earlier moments never move it back.
     assert.strictEqual(await care.syncHunger(pool, 'ut1alice', at(1)), 0);
+  });
+
+  await t.test('feeding a Marketplace food takes one of it and applies its effect', async () => {
+    await reset();
+    const { id } = await setup('ut1alice', { hunger: 100, steadPoints: 200 });
+    for (const [food, n] of [['grub-snack', 2], ['monster-meal', 1], ['punk-feast', 1]]) {
+      for (let i = 0; i < n; i++) await marketplace.buy(pool, 'ut1alice', food, null, T0);
+    }
+    // Grub Snack: 19 hours later 62, +40 stops at 100.
+    let r = await care.feed(pool, 'ut1alice', id, 'food-req-0001', at(19), 'grub-snack');
+    assert.deepStrictEqual([r.fed.hungerBefore, r.fed.hungerAfter, r.fed.food, r.fed.foodSpent], [62, 100, 'grub-snack', 1]);
+    assert.strictEqual(r.controls.food['grub-snack'], 1);
+    // The same tap again changes nothing.
+    r = await care.feed(pool, 'ut1alice', id, 'food-req-0001', at(19), 'grub-snack');
+    assert.strictEqual(r.replayed, true);
+    assert.strictEqual(r.controls.food['grub-snack'], 1);
+    // Full: refused, and the food is kept.
+    await assert.rejects(care.feed(pool, 'ut1alice', id, null, at(19), 'monster-meal'), { code: 'already_full' });
+    assert.strictEqual((await marketplace.ownedFood(pool, 'ut1alice'))['monster-meal'], 1);
+    // 40 hours later (60): Grub Snack +40.
+    r = await care.feed(pool, 'ut1alice', id, null, at(39), 'grub-snack');
+    assert.deepStrictEqual([r.fed.hungerBefore, r.fed.hungerAfter], [60, 100]);
+    // None left: refused.
+    await assert.rejects(care.feed(pool, 'ut1alice', id, null, at(69), 'grub-snack'), { code: 'no_food' });
+    // Monster Meal fills to 100 from 40.
+    r = await care.feed(pool, 'ut1alice', id, null, at(69), 'monster-meal');
+    assert.deepStrictEqual([r.fed.hungerBefore, r.fed.hungerAfter, r.fed.holdUntil], [40, 100, null]);
+    assert.strictEqual(r.creature.care.holdUntil, null);
+    // An unknown food is refused; Fodder still works the old way (none here).
+    await assert.rejects(care.feed(pool, 'ut1alice', id, null, at(99), 'cake'), { code: 'bad_food' });
+    await assert.rejects(care.feed(pool, 'ut1alice', id, null, at(99), 'fodder'), { code: 'not_enough_fodder' });
+    // Someone else's food never feeds this Creature.
+    await setup('ut1bob', { steadPoints: 100 });
+    await marketplace.buy(pool, 'ut1bob', 'grub-snack', null, T0);
+    await assert.rejects(care.feed(pool, 'ut1bob', id, null, at(99), 'grub-snack'), { code: 'not_yours' });
+    assert.strictEqual((await marketplace.ownedFood(pool, 'ut1bob'))['grub-snack'], 1);
+  });
+
+  await t.test('a Punk Feast keeps Hunger full for 24 hours, then it drops again', async () => {
+    await reset();
+    const { id } = await setup('ut1alice', { hunger: 100, steadPoints: 60 });
+    await marketplace.buy(pool, 'ut1alice', 'punk-feast', null, T0);
+    // 50 hours later: 0.
+    const r = await care.feed(pool, 'ut1alice', id, null, at(50), 'punk-feast');
+    assert.deepStrictEqual([r.fed.hungerBefore, r.fed.hungerAfter], [0, 100]);
+    assert.strictEqual(r.fed.holdUntil, at(74).toISOString());
+    assert.strictEqual(r.creature.care.holdUntil, at(74).toISOString());
+    const row = (await pool.query('SELECT * FROM creatures WHERE id = $1', [id])).rows[0];
+    assert.strictEqual(row.last_fed_at.toISOString(), at(50).toISOString());
+    // Opening the Homestead during the hold saves nothing.
+    assert.strictEqual(await care.syncHunger(pool, 'ut1alice', at(70)), 0);
+    const during = await creatures.getById(pool, id, at(73.9));
+    assert.strictEqual(during.care.hunger, 100);
+    assert.strictEqual(during.care.holdUntil, at(74).toISOString());
+    // Full during the hold: nothing more can be fed.
+    await assert.rejects(care.feed(pool, 'ut1alice', id, null, at(60)), { code: 'already_full' });
+    // After it, 2 an hour again.
+    const after = await creatures.getById(pool, id, at(84));
+    assert.strictEqual(after.care.hunger, 80);
+    assert.strictEqual(after.care.holdUntil, null);
   });
 
   await t.test('training costs 10 STEAD for +1 and leaves base stats alone', async () => {

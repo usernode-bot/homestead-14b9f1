@@ -11,6 +11,7 @@ const care = require('./lib/care');
 const gear = require('./lib/gear');
 const contests = require('./lib/contests');
 const ownership = require('./lib/ownership');
+const marketplace = require('./lib/marketplace');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -191,7 +192,7 @@ function genesisWallet(req) {
 }
 
 function sendGenesisError(res, err) {
-  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError || err instanceof gear.GearError || err instanceof contests.ContestError || err instanceof ownership.OwnershipError) {
+  if (err instanceof genesis.GenesisError || err instanceof creatures.CreatureError || err instanceof work.WorkError || err instanceof stead.SteadError || err instanceof care.CareError || err instanceof gear.GearError || err instanceof contests.ContestError || err instanceof ownership.OwnershipError || err instanceof marketplace.MarketplaceError) {
     return res.status(err.status).json({ error: err.code, message: err.message });
   }
   console.error('[genesis]', err);
@@ -289,7 +290,8 @@ app.post('/api/creatures/:id/feed', async (req, res) => {
   const id = creatureIdParam(req);
   if (!id) return res.status(404).json({ error: 'not_found', message: 'No Creature has that ID.' });
   try {
-    res.json(await care.feed(pool, wallet, id, req.body && req.body.requestId, req.now));
+    const body = req.body || {};
+    res.json(await care.feed(pool, wallet, id, body.requestId, req.now, body.food));
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -475,6 +477,30 @@ app.post('/api/stead/check-in', async (req, res) => {
   if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
   try {
     res.json(await stead.claimCheckIn(pool, wallet, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// The Marketplace (lib/marketplace.js): food bought with STEAD, for the wallet
+// the platform's verified token links to this account. Without a wallet the
+// catalog alone. One food per purchase; requestId is made once per tap, so a
+// retry or a duplicate is answered with the current state (replayed: true)
+// and charges nothing a second time.
+app.get('/api/marketplace', async (req, res) => {
+  try {
+    res.json(await marketplace.getState(pool, genesisWallet(req)));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/marketplace/buy', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const body = req.body || {};
+  try {
+    res.json(await marketplace.buy(pool, wallet, body.foodId, body.requestId, req.now));
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -680,6 +706,12 @@ async function seedStaging() {
       await gear.equip(pool, STAGING_DEMO_WALLET, opened.creature.creatureId, pick('lucky-bone').gearId, 'accessory');
     }
   }
+  // Some Marketplace food in the demo wallet's inventory, the first time only.
+  await pool.query(
+    `INSERT INTO food_inventory (owner, food_id, quantity) VALUES ($1, 'grub-snack', 2), ($1, 'punk-feast', 1)
+     ON CONFLICT DO NOTHING`,
+    [STAGING_DEMO_WALLET]
+  );
 }
 // Two more fake wallets, each with a Creature, and one Contest between them
 // made through the real challenge -> accept path ten minutes in the past, so

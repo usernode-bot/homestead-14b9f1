@@ -82,9 +82,10 @@ PR #1 built the foundation: navigation, the wallet area, the Home screen and
 placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). PR #3 made
 the Creature a full collectible (below). PR #4 added the Homestead; PR #5 Work
 & Resources (below); PR #6 STEAD Points and Daily Check-in (below); PR #7
-Feeding + Training (below); PR #8 Gear (below); PR #9 Contests (below). Listings, breeding, Gear
-crafting or trading, other STEAD spending and transactions do not exist yet,
-and none may be faked.
+Feeding + Training (below); PR #8 Gear (below); PR #9 Contests (below); then
+Marketplace food (below). Creature listings, breeding, Gear crafting or
+trading, other STEAD spending and transactions do not exist yet, and none may
+be faked.
 
 - **Genesis:** `lib/genesis.js` holds every rule, enforced in Postgres
   transactions. Genesis is repeatable for `GENESIS_COST` STEAD each
@@ -169,6 +170,15 @@ and none may be faked.
   Every value and formula is in `public/js/contest-config.js`. The opponent
   is a wallet address, or a Homeroom username resolved through the platform
   directory to the wallet that user used Genesis with.
+- **Marketplace food:** `lib/marketplace.js` sells the foods in
+  `public/js/food-config.js` (names, prices, effects: PROVISIONAL, change them
+  only there) for STEAD: one purchase is one transaction under a lock on the
+  wallet's `food_inventory` row, `debitStead` (type MARKETPLACE_PURCHASE,
+  keyed by the tap's `requestId`), at most `MAX_OWNED_PER_FOOD` of a food.
+  Food is fed through `lib/care.js` `feed(..., foodId)` and only acts on
+  Hunger; a hold (Punk Feast) stores full Hunger as of a moment still to
+  come, so `currentHunger` counts no loss until then. Food can't be sold,
+  given or refunded.
 - **Ownership cap:** a wallet owns at most `MAX_OWNED_CREATURES` (10),
   counted on the server from current ownership plus Seeds waiting to be
   awakened. There is no global Creature cap and none may be added. Every
