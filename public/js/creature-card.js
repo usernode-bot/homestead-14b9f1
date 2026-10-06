@@ -16,6 +16,7 @@
 (function () {
   var cfg = window.HOMESTEAD_CREATURE_CONFIG;
   var care = window.HOMESTEAD_CARE_CONFIG;
+  var foods = window.HOMESTEAD_FOOD_CONFIG;
   var artwork = window.HOMESTEAD_CREATURE_ART;
 
   function label(list, id) {
@@ -117,9 +118,41 @@
   // What the last Feed or Train did, as a short status line.
   function noticeText(n) {
     if (!n) return '';
+    if (n.kind === 'fed' && n.food) return 'Fed! +' + Number(n.restored) + ' Hunger, -1 ' + (foods.food(n.food) || { name: 'food' }).name;
     if (n.kind === 'fed') return 'Fed! +' + Number(n.restored) + ' Hunger, -' + Number(n.fodderSpent) + ' Fodder';
     if (n.kind === 'trained') return 'Trained! +' + Number(n.amount) + ' ' + statLabel(n.stat) + ', -' + Number(n.cost) + ' STEAD';
     return '';
+  }
+
+  // "14:30", or "Wed 14:30" when it isn't today.
+  function holdTime(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    var time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === new Date().toDateString() ? time : d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + time;
+  }
+
+  // The owner's Marketplace food: one FEED button per food they hold.
+  function foodRow(k, opts) {
+    var ctl = opts.controls;
+    var owned = (ctl && ctl.food) || {};
+    var have = foods.FOODS.filter(function (f) { return Number(owned[f.id]) > 0; });
+    var full = k.hunger >= care.HUNGER_MAX;
+    var busy = !!opts.pending;
+    var buttons = have.map(function (f) {
+      var pending = opts.pending === 'feed:' + f.id;
+      return '<button type="button" class="btn-secondary" data-action="feed-food" data-food="' + f.id + '"' + (full || busy ? ' disabled' : '') + '>' +
+        (pending ? 'FEEDING…' : f.name.toUpperCase() + ' ×' + Number(owned[f.id])) + '</button>';
+    }).join('');
+    var n = opts.notice;
+    return '<li class="list-row flex-col items-stretch gap-3" data-food-feeding>' +
+      '<span class="text-small font-bold">FOOD</span>' +
+      (have.length
+        ? '<span class="flex flex-wrap gap-2">' + buttons + '</span>' + (full ? '<p class="text-small font-bold text-muted" data-food-blocked>Already Full</p>' : '')
+        : (ctl ? '<p class="text-small text-muted" data-food-empty>No food yet.</p>' : '')) +
+      '<a href="/marketplace" data-nav class="text-small font-bold underline decoration-punk underline-offset-4" data-food-market-link>Buy food in the Marketplace.</a>' +
+      (n && n.kind === 'fed' && n.food ? '<p class="text-small font-bold text-accent" role="status" data-care-notice>' + noticeText(n) + '</p>' : '') +
+    '</li>';
   }
 
   // Hunger and condition, and for the owner the Fodder on hand and FEED.
@@ -139,6 +172,7 @@
           '<span class="block h-full rounded-full ' + (k.hungerState === 'WELL_FED' ? 'bg-accent' : k.hungerState === 'HUNGRY' ? 'bg-punk' : 'bg-danger') + '" style="width:' + pct + '%"></span>' +
         '</span>' +
         '<span class="text-body font-black" data-hunger-state="' + k.hungerState + '">' + k.hungerLabel + '</span>' +
+        (k.holdUntil ? '<span class="text-small font-bold text-accent" data-hunger-hold>Stays full until ' + holdTime(k.holdUntil) + '</span>' : '') +
       '</li>' +
       '<li class="list-row justify-between gap-4"><span class="text-muted">Condition</span>' +
         '<span class="font-bold" data-condition="' + k.condition + '">' + k.condition + '</span></li>' +
@@ -162,8 +196,9 @@
           '<button type="button" class="btn-primary" data-action="feed"' + (!ctl || full || short || busy ? ' disabled' : '') + '>' +
             (opts.pending === 'feed' ? 'FEEDING…' : 'FEED') + '</button>' +
           (why ? '<p class="text-small font-bold text-muted" data-feed-blocked>' + why + '</p>' : '') +
-          (opts.notice && opts.notice.kind === 'fed' ? '<p class="text-small font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p>' : '') +
-        '</li>';
+          (opts.notice && opts.notice.kind === 'fed' && !opts.notice.food ? '<p class="text-small font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p>' : '') +
+        '</li>' +
+        foodRow(k, opts);
     }
     return '<section data-hunger-section><h3 class="section-label">Hunger</h3><ul class="list">' + rows + '</ul></section>';
   }

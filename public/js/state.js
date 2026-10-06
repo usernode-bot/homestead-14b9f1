@@ -111,7 +111,18 @@
         error: null, // what the last request could not do
         viewed: { status: 'idle', id: null, contest: null, walletId: null, clockOffset: 0 }, // status adds 'missing'
       },
-      marketplace: { listings: [] },
+      // Food bought with STEAD (marketplace.js and lib/marketplace.js).
+      // listings is kept for Creature trading, not built yet.
+      marketplace: {
+        status: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
+        walletId: null,
+        owned: {}, // { foodId: how many this wallet holds }
+        steadBalance: null,
+        pending: null, // 'buy:<foodId>' while a purchase is in flight
+        notice: null, // the last purchase: { foodId, price }
+        error: null, // what the last purchase could not do
+        listings: [],
+      },
       breeding: null,
     };
   }

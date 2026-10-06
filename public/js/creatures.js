@@ -101,9 +101,12 @@
     afterCare(kind);
   }
 
-  // What else a Feed or Train changed: storage (Fodder) or the STEAD balance.
+  // What else a Feed or Train changed: storage (Fodder), Marketplace food or
+  // the STEAD balance.
   function afterCare(kind) {
-    if (kind === 'feed') {
+    if (kind.indexOf('feed:') === 0) {
+      if (window.HOMESTEAD_MARKETPLACE) window.HOMESTEAD_MARKETPLACE.forget();
+    } else if (kind === 'feed') {
       // The Homestead reloads its storage next time it is opened.
       if (store.get().homestead.status === 'ready') store.update('homestead', { key: null });
     } else if (window.HOMESTEAD_STEAD) {
@@ -111,10 +114,11 @@
     }
   }
 
-  function feed() {
+  // With Fodder, or with `food`, a food bought in the Marketplace.
+  function feed(food) {
     var v = store.get().viewedCreature;
-    return careRequest('feed', '/api/creatures/' + Number(v.id) + '/feed', {}, function (data) {
-      return { kind: 'fed', restored: data.fed.restored, fodderSpent: data.fed.fodderSpent };
+    return careRequest(food ? 'feed:' + food : 'feed', '/api/creatures/' + Number(v.id) + '/feed', food ? { food: food } : {}, function (data) {
+      return { kind: 'fed', restored: data.fed.restored, fodderSpent: data.fed.fodderSpent, food: data.fed.food || null };
     });
   }
 

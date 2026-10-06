@@ -7,6 +7,7 @@
   var cards = window.HOMESTEAD_CREATURE_CARD;
   var homesteadView = window.HOMESTEAD_HOMESTEAD_VIEW;
   var steadConfig = window.HOMESTEAD_STEAD_CONFIG;
+  var foodConfig = window.HOMESTEAD_FOOD_CONFIG;
   var gearView = window.HOMESTEAD_GEAR_VIEW;
   var contestView = window.HOMESTEAD_CONTEST_VIEW;
 
@@ -551,8 +552,64 @@
   function contestById(state, route) {
     return contestView.detail(state, pageHeading({ key: 'contests', label: 'CONTEST' }));
   }
+  // The Marketplace, /marketplace: food bought with STEAD. The foods and
+  // prices come from food-config.js, so they show without a wallet; how many
+  // this wallet holds and its STEAD are what the server answered.
   function marketplace(state, route) {
-    return placeholder(route, 'No Creatures listed yet.', 'Trading opens in a future update.');
+    var m = state.marketplace;
+    var connected = state.wallet.status === 'connected';
+    var ready = connected && m.status === 'ready';
+    var top = '';
+    if (!connected) {
+      top = '<section class="collectible state-empty mb-8 py-10" data-empty="marketplace">' +
+        '<p class="text-heading">Connect your wallet to buy food.</p>' +
+        '<p class="max-w-sm text-body text-muted">Food is bought with STEAD from the wallet linked to your Homeroom account.</p>' +
+        (state.wallet.status === 'connecting' ? '' : '<button type="button" class="btn-secondary mt-2" data-action="connect">CONNECT WALLET</button>') +
+      '</section>';
+    } else if (m.status === 'error') {
+      top = '<section class="collectible state-error mb-8">' +
+        '<p class="text-heading">Couldn\'t load the Marketplace.</p>' +
+        '<p class="max-w-sm text-body text-muted">Your STEAD is safe. Check your connection and try again.</p>' +
+        '<button type="button" class="btn-secondary mt-2" data-action="marketplace-retry">Retry</button>' +
+      '</section>';
+    } else {
+      top = '<ul class="list mb-8"><li class="list-row justify-between"><span class="text-muted">STEAD Balance</span>' +
+        (ready && m.steadBalance != null
+          ? '<span class="font-black tabular-nums" data-market-stead="' + Number(m.steadBalance) + '">' + steadAmount(m.steadBalance) + '</span>'
+          : '<span class="skeleton inline-block h-5 w-24" aria-busy="true"><span class="sr-only">Loading your STEAD</span></span>') +
+      '</li></ul>';
+    }
+    var bought = m.notice && foodConfig.food(m.notice.foodId);
+    var messages = (bought ? '<p class="mb-4 text-body font-bold text-accent" role="status" data-market-notice>Bought 1 ' + bought.name + ' for ' + steadAmount(m.notice.price) + '.</p>' : '') +
+      (m.error ? '<p role="alert" class="mb-4 text-small text-danger" data-field="market-error"></p>' : '');
+    var rows = foodConfig.FOODS.map(function (f) {
+      var owned = ready ? Number(m.owned[f.id]) || 0 : null;
+      var action = '';
+      if (connected) {
+        var pending = m.pending === 'buy:' + f.id;
+        var full = ready && owned >= foodConfig.MAX_OWNED_PER_FOOD;
+        var poor = ready && m.steadBalance != null && m.steadBalance < f.price;
+        var text = pending ? 'BUYING…' : full ? 'You have the most you can hold' : poor ? 'Need ' + steadAmount(f.price) : 'BUY';
+        action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-food" data-food="' + f.id + '"' +
+          (!ready || m.pending || full || poor ? ' disabled' : '') + '>' + text + '</button>';
+      }
+      return '<li class="list-row flex-wrap justify-between gap-3" data-food="' + f.id + '">' +
+        '<span class="min-w-0">' +
+          '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-black">' + f.name + '</span>' +
+            '<span class="sticker" data-food-price="' + f.price + '">' + steadAmount(f.price) + '</span></span>' +
+          '<span class="mt-1 block text-small text-muted">' + f.description + '</span>' +
+          (connected ? '<span class="mt-1 block text-small font-bold tabular-nums" data-food-owned="' + (owned == null ? '' : owned) + '">' +
+            (owned == null ? 'You have …' : 'You have ' + owned) + '</span>' : '') +
+        '</span>' +
+        action +
+      '</li>';
+    }).join('');
+    return screenHeading(route) +
+      '<div class="max-w-3xl">' + top + messages +
+        '<h2 class="section-label">Food</h2>' +
+        '<ul class="list" data-market-foods>' + rows + '</ul>' +
+        '<p class="mt-3 px-1 text-small text-muted">Feed food to your Creature on its profile. Creature trading opens in a future update.</p>' +
+      '</div>';
   }
   // A Creature by its id, /creature/<id>: anyone can look; only its owner
   // can rename it.

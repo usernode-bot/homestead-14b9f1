@@ -54,8 +54,9 @@
   }
 
   // Hunger at `now` for hunger `stored` as of `since` (a Date or ISO time).
-  // A whole number, never below 0. A `now` before `since` (a preview shown as
-  // of an earlier moment) counts as no time passed.
+  // A whole number, never below 0. A `now` before `since` counts as no time
+  // passed: a preview shown as of an earlier moment, or a food's hold
+  // (food-config.js), which stores full Hunger as of a moment still to come.
   function currentHunger(stored, since, now) {
     var from = new Date(since).getTime();
     var to = new Date(now).getTime();

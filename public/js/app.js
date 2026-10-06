@@ -9,6 +9,7 @@
   var stead = window.HOMESTEAD_STEAD;
   var gear = window.HOMESTEAD_GEAR;
   var contests = window.HOMESTEAD_CONTESTS;
+  var market = window.HOMESTEAD_MARKETPLACE;
   var contestView = window.HOMESTEAD_CONTEST_VIEW;
   var navEl = document.getElementById('nav');
   var walletEl = document.getElementById('wallet');
@@ -107,6 +108,7 @@
       'stead-error': state.stead.error || '',
       'care-error': state.viewedCreature.error || '',
       'gear-error': state.gear.error || '',
+      'market-error': state.marketplace.error || '',
     };
     document.querySelectorAll('[data-field]').forEach(function (el) {
       el.textContent = values[el.dataset.field] || '';
@@ -160,6 +162,7 @@
     // The Gear inventory, for the Gear screen and the owner's Gear picker.
     if (route.key === 'gear' || route.creatureId || ownId) gear.ensure();
     if (route.key === 'contests') contests.ensure();
+    if (route.key === 'marketplace') market.ensure();
     if (route.contestId) contests.view(route.contestId);
     var state = store.get();
     var title = route.title || route.label;
@@ -195,7 +198,10 @@
     history.pushState(null, '', path + window.location.search);
     clearGearMessages();
     contests.clearMessages();
+    market.clearMessages();
     refreshCreature();
+    // The Marketplace shows this wallet's STEAD and food as they now are.
+    if (path === '/marketplace' && store.get().marketplace.status === 'ready') market.load();
     if (CONTEST_PATH.test(path)) contests.view(Number(CONTEST_PATH.exec(path)[1]), true, true);
     render();
     window.scrollTo(0, 0);
@@ -229,6 +235,9 @@
       else if (name === 'work-collect') homesteads.collect(Number(action.dataset.workId));
       else if (name === 'work-collect-pending') homesteads.collectPending();
       else if (name === 'feed') creatures.feed();
+      else if (name === 'feed-food') creatures.feed(action.dataset.food);
+      else if (name === 'buy-food') market.buy(action.dataset.food);
+      else if (name === 'marketplace-retry') market.load();
       else if (name === 'train') creatures.train(action.dataset.stat);
       else if (name === 'gear-claim') gear.claim();
       else if (name === 'gear-retry') gear.load();

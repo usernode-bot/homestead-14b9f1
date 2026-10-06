@@ -118,10 +118,18 @@
       "expectText": "No Homestead has that number."
     },
     {
-      "name": "Marketplace placeholder",
+      "id": "marketplace.food",
+      "name": "Marketplace shows the three foods with prices",
       "path": "/marketplace",
-      "expectSelector": "[data-empty=\"marketplace\"]",
-      "expectText": "No Creatures listed yet."
+      "expectSelector": "[data-market-foods] [data-food=\"punk-feast\"]",
+      "expectText": "60 STEAD",
+      "visual": true,
+      "impact": [
+        "public/js/marketplace.js",
+        "public/js/food-config.js",
+        "public/js/screens.js",
+        "styles/**"
+      ]
     },
     {
       "name": "Collection placeholder",
