@@ -6,9 +6,7 @@
   "secrets": [],
   "governance": {
     "approvers": "invited",
-    "approvals": {
-      "atLeast": 1
-    }
+    "approvals": "default"
   },
   "tests": [
     {
