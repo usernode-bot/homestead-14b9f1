@@ -36,6 +36,10 @@
     GENESIS: Object.freeze({ label: 'Genesis', direction: 'debit', active: true }),
     // Paid once per food bought in the Marketplace (lib/marketplace.js).
     MARKETPLACE_PURCHASE: Object.freeze({ label: 'Marketplace', direction: 'debit', active: true }),
+    // A player's Resource listing changing hands (lib/marketplace.js): the
+    // buyer pays, the seller is paid, both keyed by the listing, once each.
+    RESOURCE_PURCHASE: Object.freeze({ label: 'Resources Bought', direction: 'debit', active: true }),
+    RESOURCE_SALE: Object.freeze({ label: 'Resources Sold', direction: 'credit', active: true }),
     FEEDING: Object.freeze({ label: 'Feeding', direction: 'debit', active: false }),
     GEAR: Object.freeze({ label: 'Gear', direction: 'debit', active: false }),
     UPGRADE: Object.freeze({ label: 'Homestead Upgrade', direction: 'debit', active: false }),

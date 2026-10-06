@@ -8,6 +8,8 @@
   var homesteadView = window.HOMESTEAD_HOMESTEAD_VIEW;
   var steadConfig = window.HOMESTEAD_STEAD_CONFIG;
   var foodConfig = window.HOMESTEAD_FOOD_CONFIG;
+  var marketConfig = window.HOMESTEAD_MARKET_CONFIG;
+  var homesteadConfig = window.HOMESTEAD_HOMESTEAD_CONFIG;
   var gearView = window.HOMESTEAD_GEAR_VIEW;
   var contestView = window.HOMESTEAD_CONTEST_VIEW;
 
@@ -552,9 +554,129 @@
   function contestById(state, route) {
     return contestView.detail(state, pageHeading({ key: 'contests', label: 'CONTEST' }));
   }
-  // The Marketplace, /marketplace: food bought with STEAD. The foods and
-  // prices come from food-config.js, so they show without a wallet; how many
-  // this wallet holds and its STEAD are what the server answered.
+  // The Marketplace, /marketplace: players' Resource listings, and food
+  // bought with STEAD. The foods and prices come from food-config.js, so
+  // they show without a wallet; listings, how much this wallet holds and its
+  // STEAD are what the server answered. Names are filled in as text
+  // (marketplace.js fillForm).
+  function resourceLabel(key) {
+    var r = homesteadConfig.RESOURCES.find(function (x) { return x.key === key; });
+    return r ? r.label : key;
+  }
+  function lot(l) { return fmt(l.quantity) + ' ' + resourceLabel(l.resource); }
+
+  function marketNotice(m) {
+    var n = m.notice;
+    if (!n) return '';
+    var text = '';
+    if (n.kind === 'listed') text = 'Listed ' + lot(n.listing) + ' for ' + steadAmount(n.listing.price) + '.';
+    else if (n.kind === 'bought-listing') text = 'Bought ' + lot(n.listing) + ' for ' + steadAmount(n.listing.price) + '. It\'s in your storage.';
+    else if (n.kind === 'cancelled') text = 'Listing cancelled. ' + lot(n.listing) + ' went back to your storage.';
+    else {
+      var bought = foodConfig.food(n.foodId);
+      if (bought) text = 'Bought 1 ' + bought.name + ' for ' + steadAmount(n.price) + '.';
+    }
+    return text ? '<p class="mb-4 text-body font-bold text-accent" role="status" data-market-notice>' + text + '</p>' : '';
+  }
+
+  function listingsForSale(state, m, connected, ready) {
+    var body;
+    if (m.status === 'error' && !connected) {
+      body = '<section class="collectible state-error">' +
+        '<p class="text-heading">Couldn\'t load what\'s for sale.</p>' +
+        '<button type="button" class="btn-secondary mt-2" data-action="marketplace-retry">Retry</button>' +
+      '</section>';
+    } else if (m.status !== 'ready') {
+      body = '<ul class="list" aria-busy="true"><li class="list-row"><span class="skeleton inline-block h-5 w-40"><span class="sr-only">Loading listings</span></span></li></ul>';
+    } else if (!m.listings.length) {
+      body = '<ul class="list" data-market-listings><li class="list-row text-body text-muted" data-empty="listings">No Resources for sale right now.' +
+        (connected ? ' List yours below.' : '') + '</li></ul>';
+    } else {
+      var free = ready && m.storage ? m.storage.capacity - m.storage.used : null;
+      body = '<ul class="list" data-market-listings>' + m.listings.map(function (l) {
+        var id = Number(l.listingId);
+        var action = '';
+        if (connected) {
+          var pending = m.pending === 'buy-listing:' + id;
+          var poor = ready && m.steadBalance != null && m.steadBalance < l.price;
+          var noRoom = free != null && free < l.quantity;
+          var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : noRoom ? 'No room in storage' : 'BUY';
+          action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-listing" data-listing-id="' + id + '"' +
+            (!ready || m.pending || poor || noRoom ? ' disabled' : '') + '>' + text + '</button>';
+        }
+        return '<li class="list-row flex-wrap justify-between gap-3" data-listing="' + id + '" data-listing-resource="' + l.resource + '">' +
+          '<span class="min-w-0">' +
+            '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-black tabular-nums">' + lot(l) + '</span>' +
+              '<span class="sticker" data-listing-price="' + Number(l.price) + '">' + steadAmount(l.price) + '</span></span>' +
+            '<span class="mt-1 block text-small text-muted">Sold by <span data-listing-seller="' + id + '"></span></span>' +
+          '</span>' +
+          action +
+        '</li>';
+      }).join('') + '</ul>';
+    }
+    return '<h2 class="section-label">Resources for sale</h2>' + body;
+  }
+
+  function sellPanel(m) {
+    var storage = m.storage && m.storage.storage;
+    var have = storage ? homesteadConfig.RESOURCES.filter(function (r) { return Number(storage[r.key]) > 0; }) : [];
+    var body;
+    if (!have.length) {
+      body = '<ul class="list"><li class="list-row flex-wrap justify-between gap-3" data-empty="sell">' +
+        '<span class="text-body text-muted">Nothing to sell yet. Send a Creature to work to bring home Resources.</span>' +
+        '<a href="/homestead" data-nav class="btn-secondary shrink-0">Go to Homestead</a>' +
+      '</li></ul>';
+    } else {
+      var active = m.myListings.filter(function (l) { return l.status === 'active'; }).length;
+      var atMax = active >= marketConfig.MAX_ACTIVE_LISTINGS;
+      var busy = m.pending === 'list';
+      var options = have.map(function (r) {
+        return '<option value="' + r.key + '">' + r.label + ' (' + fmt(storage[r.key]) + ')</option>';
+      }).join('');
+      body = '<form id="market-sell-form" class="grid gap-4 rounded-xl border border-line bg-surface p-4 sm:grid-cols-3" novalidate data-market-sell>' +
+        '<div><label for="market-resource" class="block text-small text-muted">Resource</label>' +
+          '<select id="market-resource" class="field mt-1" data-market-input="resource">' + options + '</select></div>' +
+        '<div><label for="market-quantity" class="block text-small text-muted">How many</label>' +
+          '<input id="market-quantity" class="field mt-1" type="number" inputmode="numeric" min="1" step="1" autocomplete="off" data-market-input="quantity"></div>' +
+        '<div><label for="market-price" class="block text-small text-muted">Price for all (STEAD)</label>' +
+          '<input id="market-price" class="field mt-1" type="number" inputmode="numeric" min="1" max="' + marketConfig.MAX_PRICE + '" step="1" autocomplete="off" data-market-input="price"></div>' +
+        '<div class="sm:col-span-3"><button type="submit" class="btn-primary" data-action="market-list"' + (busy || m.pending || atMax ? ' disabled' : '') + '>' +
+          (busy ? 'LISTING…' : 'LIST FOR SALE') + '</button>' +
+          '<p class="mt-2 text-small text-muted">' + (atMax
+            ? 'You have ' + marketConfig.MAX_ACTIVE_LISTINGS + ' listings up, the most at once. Cancel one or wait for a sale.'
+            : 'The Resources leave your storage while they are listed. Cancel the listing to get them back.') + '</p></div>' +
+      '</form>';
+    }
+    return '<h2 class="section-label mt-8">Sell Resources</h2>' + body;
+  }
+
+  function myListings(m) {
+    if (!m.myListings.length) return '';
+    return '<h2 class="section-label mt-8">Your listings</h2><ul class="list" data-my-listings>' + m.myListings.map(function (l) {
+      var id = Number(l.listingId);
+      var detail;
+      var action = '';
+      if (l.status === 'active') {
+        var pending = m.pending === 'cancel-listing:' + id;
+        detail = 'For sale';
+        action = '<button type="button" class="btn-secondary shrink-0" data-action="cancel-listing" data-listing-id="' + id + '"' +
+          (m.pending ? ' disabled' : '') + '>' + (pending ? 'CANCELLING…' : 'CANCEL') + '</button>';
+      } else if (l.status === 'sold') {
+        detail = 'Sold to <span data-listing-buyer="' + id + '"></span>. You got ' + steadAmount(l.price) + '.';
+      } else {
+        detail = 'Cancelled. Back in your storage.';
+      }
+      return '<li class="list-row flex-wrap justify-between gap-3" data-my-listing="' + id + '" data-listing-status="' + l.status + '">' +
+        '<span class="min-w-0">' +
+          '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-black tabular-nums">' + lot(l) + '</span>' +
+            '<span class="sticker">' + steadAmount(l.price) + '</span></span>' +
+          '<span class="mt-1 block text-small text-muted">' + detail + '</span>' +
+        '</span>' +
+        action +
+      '</li>';
+    }).join('') + '</ul>';
+  }
+
   function marketplace(state, route) {
     var m = state.marketplace;
     var connected = state.wallet.status === 'connected';
@@ -562,8 +684,8 @@
     var top = '';
     if (!connected) {
       top = '<section class="collectible state-empty mb-8 py-10" data-empty="marketplace">' +
-        '<p class="text-heading">Connect your wallet to buy food.</p>' +
-        '<p class="max-w-sm text-body text-muted">Food is bought with STEAD from the wallet linked to your Homeroom account.</p>' +
+        '<p class="text-heading">Connect your wallet to buy and sell.</p>' +
+        '<p class="max-w-sm text-body text-muted">Everything here is paid in STEAD from the wallet linked to your Homeroom account.</p>' +
         (state.wallet.status === 'connecting' ? '' : '<button type="button" class="btn-secondary mt-2" data-action="connect">CONNECT WALLET</button>') +
       '</section>';
     } else if (m.status === 'error') {
@@ -579,9 +701,10 @@
           : '<span class="skeleton inline-block h-5 w-24" aria-busy="true"><span class="sr-only">Loading your STEAD</span></span>') +
       '</li></ul>';
     }
-    var bought = m.notice && foodConfig.food(m.notice.foodId);
-    var messages = (bought ? '<p class="mb-4 text-body font-bold text-accent" role="status" data-market-notice>Bought 1 ' + bought.name + ' for ' + steadAmount(m.notice.price) + '.</p>' : '') +
+    var messages = marketNotice(m) +
       (m.error ? '<p role="alert" class="mb-4 text-small text-danger" data-field="market-error"></p>' : '');
+    var trade = (connected && m.status === 'error') ? '' : listingsForSale(state, m, connected, ready) +
+      (ready ? sellPanel(m) + myListings(m) : '');
     var rows = foodConfig.FOODS.map(function (f) {
       var owned = ready ? Number(m.owned[f.id]) || 0 : null;
       var action = '';
@@ -605,8 +728,8 @@
       '</li>';
     }).join('');
     return screenHeading(route) +
-      '<div class="max-w-3xl">' + top + messages +
-        '<h2 class="section-label">Food</h2>' +
+      '<div class="max-w-3xl">' + top + messages + trade +
+        '<h2 class="section-label' + (trade ? ' mt-8' : '') + '">Food</h2>' +
         '<ul class="list" data-market-foods>' + rows + '</ul>' +
         '<p class="mt-3 px-1 text-small text-muted">Feed food to your Creature on its profile. Creature trading opens in a future update.</p>' +
       '</div>';

@@ -176,6 +176,7 @@
     viewEl.innerHTML = screens.render[route.key](state, route);
     fillFields(state);
     contestView.fill(viewEl);
+    if (route.key === 'marketplace') market.fillForm(viewEl);
     if (focusId) {
       var again = document.getElementById(focusId);
       if (again) {
@@ -238,6 +239,8 @@
       else if (name === 'feed-food') creatures.feed(action.dataset.food);
       else if (name === 'buy-food') market.buy(action.dataset.food);
       else if (name === 'marketplace-retry') market.load();
+      else if (name === 'buy-listing') market.buyListing(Number(action.dataset.listingId));
+      else if (name === 'cancel-listing') market.cancelListing(Number(action.dataset.listingId));
       else if (name === 'train') creatures.train(action.dataset.stat);
       else if (name === 'gear-claim') gear.claim();
       else if (name === 'gear-retry') gear.load();
