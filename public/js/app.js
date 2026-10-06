@@ -36,7 +36,7 @@
     }
     var cm = CONTEST_PATH.exec(path);
     if (cm) {
-      return { path: path, key: 'contestById', label: 'CONTEST', nav: screens.ROUTES.find(function (r) { return r.key === 'contests'; }), contestId: Number(cm[1]) };
+      return { path: path, key: 'contestById', label: 'BATTLE', nav: screens.ROUTES.find(function (r) { return r.key === 'contests'; }), contestId: Number(cm[1]) };
     }
     // The Gear inventory is opened from the Homestead, and sits under it.
     if (path === '/gear') {
