@@ -12,7 +12,7 @@ const creatures = require('../lib/creatures');
 const homestead = require('../lib/homestead');
 
 test('Homestead config', () => {
-  assert.deepStrictEqual(hcfg.START, { level: 1, capacity: 1, storageCapacity: 100 });
+  assert.deepStrictEqual(hcfg.START, { level: 1, capacity: 1, storageCapacity: 2000000000 });
   assert.strictEqual(hcfg.BUILDINGS.map((b) => b.name).join(','), 'Barn,Mine,Lumber Camp,Fishing Hut,Workshop,Mystic Shrine');
   for (const b of hcfg.BUILDINGS) assert.ok(b.description.length > 10, b.id);
   assert.deepStrictEqual(hcfg.BUILDING_START, { level: 0, unlocked: false });
@@ -61,7 +61,7 @@ test('Homesteads in Postgres', { skip: !url && 'DATABASE_URL is not set' }, asyn
     assert.strictEqual(h.level, 1);
     assert.strictEqual(h.capacity, 1);
     assert.strictEqual(h.creatureId, c.creatureId);
-    assert.strictEqual(h.storageCapacity, 100);
+    assert.strictEqual(h.storageCapacity, 2000000000);
     assert.strictEqual(h.storageUsed, 0);
     assert.deepStrictEqual(h.storage, hcfg.emptyStorage());
     // Only the building of the Creature's Trade is unlocked (PR #5 Work).
@@ -138,14 +138,29 @@ test('Homesteads in Postgres', { skip: !url && 'DATABASE_URL is not set' }, asyn
     await awakenFor('ut1alice');
     const { homestead: h } = await homestead.open(pool, 'ut1alice');
     const set = (storage) => pool.query('UPDATE homesteads SET storage = $2 WHERE id = $1', [h.homesteadId, JSON.stringify(storage)]);
-    await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: 101 })));
-    await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: 60, stone: 41 })));
+    await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: 2000000001 })));
     await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: -1 })));
     await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: 'lots' })));
     await assert.rejects(pool.query('UPDATE homesteads SET storage_capacity = -1 WHERE id = $1', [h.homesteadId]));
     await set(Object.assign(hcfg.emptyStorage(), { wood: 60, stone: 40 }));
     const again = await homestead.open(pool, 'ut1alice');
     assert.strictEqual(again.homestead.storageUsed, 100);
+  });
+
+  await t.test('existing Homesteads are raised to the unlimited storage capacity on boot', async () => {
+    await reset();
+    await awakenFor('ut1alice');
+    const { homestead: h } = await homestead.open(pool, 'ut1alice');
+    // A table and a Homestead made under the old small limit.
+    await pool.query('ALTER TABLE homesteads ALTER COLUMN storage_capacity SET DEFAULT 100');
+    await pool.query('UPDATE homesteads SET storage_capacity = 100 WHERE id = $1', [h.homesteadId]);
+    await homestead.ensureSchema(pool);
+    const again = await homestead.open(pool, 'ut1alice');
+    assert.strictEqual(again.homestead.storageCapacity, 2000000000);
+    // A Homestead made after the boot gets the new default too.
+    await awakenFor('ut1bob');
+    const bob = await homestead.open(pool, 'ut1bob');
+    assert.strictEqual(bob.homestead.storageCapacity, 2000000000);
   });
 
   await t.test('a Homestead\'s id, owner and creation time are permanent', async () => {

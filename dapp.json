@@ -99,8 +99,8 @@
     {
       "name": "A new Homestead's storage is empty",
       "path": "/homestead/900001",
-      "expectSelector": "[data-storage] [data-storage-used=\"0\"][data-storage-capacity=\"100\"]",
-      "expectText": "0 / 100"
+      "expectSelector": "[data-storage] [data-storage-used=\"0\"]",
+      "expectText": "0"
     },
     {
       "name": "The Creature's Trade building is available",

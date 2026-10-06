@@ -294,31 +294,11 @@
     '</section>';
   }
 
-  // Storage (used / capacity), what is waiting for space, and every resource
-  // by group.
-  function resourcesSection(h, opts) {
+  // Storage: the total held, and every resource by group. Storage is
+  // unlimited, so there is no capacity to show and rewards are never held
+  // back for lack of space.
+  function resourcesSection(h) {
     var used = Number(h.storageUsed) || 0;
-    var cap = Number(h.storageCapacity) || 0;
-    var pct = cap ? Math.min(100, (used / cap) * 100) : 0;
-    var work = opts.work;
-    var waiting = work ? Number(work.pendingTotal) || 0 : 0;
-    var free = Math.max(0, cap - used);
-    var pendingRow = '';
-    if (waiting > 0) {
-      pendingRow =
-        '<li class="list-row flex-col items-stretch gap-2" data-storage-full="' + (free ? 'false' : 'true') + '">' +
-          '<p class="text-body font-black text-punk">' + (free ? 'REWARDS WAITING' : 'STORAGE FULL') + '</p>' +
-          '<p class="text-small">' + (free
-            ? 'Some rewards did not fit last time. There is space for ' + fmt(free) + ' more now.'
-            : 'Your work is complete, but there is not enough storage space. Free some storage before collecting the remaining rewards.') +
-          '</p>' +
-          '<p class="text-small text-muted">Waiting, safe on your Work: ' + fmt(waiting) + '</p>' +
-          amounts(work.pending) +
-          (opts.canAct && free
-            ? '<button type="button" class="btn-secondary self-start" data-action="work-collect-pending"' + (opts.pending ? ' disabled' : '') + '>Collect the rest</button>'
-            : '') +
-        '</li>';
-    }
     var groups = wcfg.RESOURCE_GROUPS.map(function (g) {
       return '<li class="list-row flex-col items-stretch gap-2" data-resource-group="' + g.id + '">' +
         '<span class="text-small font-bold text-muted">' + g.label + '</span>' +
@@ -337,14 +317,10 @@
         '<li class="list-row flex-col items-stretch gap-3">' +
           '<span class="flex items-center justify-between gap-3">' +
             '<span class="flex items-center gap-3 font-bold">' + icon('storage', 'h-5 w-5 text-punk') + 'STORAGE</span>' +
-            '<span class="font-black tabular-nums" data-storage-used="' + used + '" data-storage-capacity="' + cap + '">' + fmt(used) + ' / ' + fmt(cap) + '</span>' +
-          '</span>' +
-          '<span class="block h-2 overflow-hidden rounded-full bg-raised" role="progressbar" aria-label="Storage used" aria-valuemin="0" aria-valuemax="' + cap + '" aria-valuenow="' + used + '">' +
-            '<span class="block h-full rounded-full bg-accent" style="width:' + pct + '%"></span>' +
+            '<span class="font-black tabular-nums" data-storage-used="' + used + '">' + fmt(used) + '</span>' +
           '</span>' +
           (used ? '' : '<span class="text-small text-muted" data-storage-empty>Empty. Work brings resources home here.</span>') +
         '</li>' +
-        pendingRow +
         groups +
       '</ul>' +
     '</section>';
@@ -356,14 +332,12 @@
     var rows = entries.map(function (w) {
       var t = wcfg.trade(w.trade);
       var who = c && c.creatureId === w.creatureId ? cards.nameSpan(c) : cards.formatId(w.creatureId);
-      var waiting = Number(w.pendingTotal) || 0;
       return '<li class="list-row flex-col items-stretch gap-1" data-work-history-entry="' + Number(w.workId) + '">' +
         '<span class="flex items-center justify-between gap-3">' +
           '<span class="min-w-0 truncate font-bold">' + who + ' · ' + (t ? t.doing : 'Work') + '</span>' +
           '<span class="text-small text-muted tabular-nums">' + Math.round(w.durationSeconds / 3600) + 'h</span>' +
         '</span>' +
         amounts(w.rewards) +
-        (waiting ? '<span class="text-small text-punk">' + fmt(waiting) + ' waiting for storage space</span>' : '') +
       '</li>';
     }).join('');
     return '<section class="mt-8" data-work-history>' +
@@ -394,7 +368,7 @@
         residentInfo(c, opts.work) +
       '</section>' +
       workSections(c, opts) +
-      resourcesSection(h, opts) +
+      resourcesSection(h) +
       '<section class="mt-8">' +
         '<h2 class="section-label">Buildings</h2>' +
         '<ul class="grid grid-cols-2 gap-3 lg:grid-cols-3" data-buildings>' + h.buildings.map(function (b) {

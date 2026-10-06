@@ -223,7 +223,7 @@ test('Resource listings in Postgres', { skip: !url && 'DATABASE_URL is not set' 
     assert.strictEqual(await stead.getSteadBalance(pool, 'ut1sam'), 30);
   });
 
-  await t.test('buying is refused for your own listing, too little STEAD or no room, and changes nothing', async () => {
+  await t.test('buying is refused for your own listing or too little STEAD, and changes nothing', async () => {
     await reset();
     await home('ut1sam', { wood: 12 });
     await home('ut1bea', {});
@@ -233,11 +233,9 @@ test('Resource listings in Postgres', { skip: !url && 'DATABASE_URL is not set' 
     await assert.rejects(marketplace.buyListing(pool, 'ut1sam', 'sam', listed.listingId, T0), { code: 'own_listing' });
     await assert.rejects(marketplace.buyListing(pool, 'ut1bea', 'bea', listed.listingId, T0), { code: 'not_enough_stead', message: 'Need 30 STEAD.' });
     await fund('ut1bea', 1);
-    await pool.query('UPDATE homesteads SET storage = $2 WHERE owner = $1', ['ut1bea', JSON.stringify(Object.assign(hcfg.emptyStorage(), { stone: 95 }))]);
-    await assert.rejects(marketplace.buyListing(pool, 'ut1bea', 'bea', listed.listingId, T0), { code: 'no_room' });
     await assert.rejects(marketplace.buyListing(pool, 'ut1bea', 'bea', 999999, T0), { code: 'listing_missing', status: 404 });
     assert.deepStrictEqual([await stead.getSteadBalance(pool, 'ut1bea'), await stead.getSteadBalance(pool, 'ut1sam')], [30, 100]);
-    assert.deepStrictEqual([(await storage('ut1bea')).wood, (await storage('ut1bea')).stone], [0, 95]);
+    assert.strictEqual((await storage('ut1bea')).wood, 0);
     assert.strictEqual((await pool.query('SELECT status FROM market_listings')).rows[0].status, 'active');
   });
 
@@ -273,15 +271,12 @@ test('Resource listings in Postgres', { skip: !url && 'DATABASE_URL is not set' 
 
   await t.test('the seller can cancel an unsold listing and gets the Resources back', async () => {
     await reset();
-    await home('ut1sam', { wood: 12 }, 20);
+    await home('ut1sam', { wood: 12 });
     await home('ut1bea', {});
     await fund('ut1bea', 100);
     const { listed } = await list('ut1sam', 'wood', 12, 30);
     await assert.rejects(marketplace.cancelListing(pool, 'ut1bea', listed.listingId, T0), { code: 'not_your_listing', status: 403 });
-    // No room for them back yet.
-    await pool.query('UPDATE homesteads SET storage = $2 WHERE owner = $1', ['ut1sam', JSON.stringify(Object.assign(hcfg.emptyStorage(), { stone: 10 }))]);
-    await assert.rejects(marketplace.cancelListing(pool, 'ut1sam', listed.listingId, T0), { code: 'no_room' });
-    await pool.query('UPDATE homesteads SET storage = $2 WHERE owner = $1', ['ut1sam', JSON.stringify(hcfg.emptyStorage())]);
+    // Storage always has room, so the Resources come straight back.
     const r = await marketplace.cancelListing(pool, 'ut1sam', listed.listingId, T0);
     assert.strictEqual(r.cancelled.status, 'cancelled');
     assert.strictEqual((await storage('ut1sam')).wood, 12);

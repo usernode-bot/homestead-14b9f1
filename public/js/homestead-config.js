@@ -13,7 +13,9 @@
   var START = Object.freeze({
     level: 1,
     capacity: 1, // how many Creatures can live in it
-    storageCapacity: 100, // the most resources storage can ever hold in total
+    // Storage is unlimited in practice: a very large fixed number inside the
+    // INT range that nobody will ever reach in play, and that is never shown.
+    storageCapacity: 2000000000,
   });
 
   // The building slots every Homestead has, in display order. Each starts at
