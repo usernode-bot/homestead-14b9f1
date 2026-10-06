@@ -132,31 +132,9 @@
     return d.toDateString() === new Date().toDateString() ? time : d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + time;
   }
 
-  // The owner's Marketplace food: one FEED button per food they hold.
-  function foodRow(k, opts) {
-    var ctl = opts.controls;
-    var owned = (ctl && ctl.food) || {};
-    var have = foods.FOODS.filter(function (f) { return Number(owned[f.id]) > 0; });
-    var full = k.hunger >= care.HUNGER_MAX;
-    var busy = !!opts.pending;
-    var buttons = have.map(function (f) {
-      var pending = opts.pending === 'feed:' + f.id;
-      return '<button type="button" class="btn-secondary" data-action="feed-food" data-food="' + f.id + '"' + (full || busy ? ' disabled' : '') + '>' +
-        (pending ? 'FEEDING…' : f.name.toUpperCase() + ' ×' + Number(owned[f.id])) + '</button>';
-    }).join('');
-    var n = opts.notice;
-    return '<li class="list-row flex-col items-stretch gap-3" data-food-feeding>' +
-      '<span class="text-small font-bold">FOOD</span>' +
-      (have.length
-        ? '<span class="flex flex-wrap gap-2">' + buttons + '</span>' + (full ? '<p class="text-small font-bold text-muted" data-food-blocked>Already Full</p>' : '')
-        : (ctl ? '<p class="text-small text-muted" data-food-empty>No food yet.</p>' : '')) +
-      '<a href="/marketplace" data-nav class="text-small font-bold underline decoration-punk underline-offset-4" data-food-market-link>Buy food in the Marketplace.</a>' +
-      (n && n.kind === 'fed' && n.food ? '<p class="text-small font-bold text-accent" role="status" data-care-notice>' + noticeText(n) + '</p>' : '') +
-    '</li>';
-  }
-
-  // Hunger and condition, and for the owner the Fodder on hand and FEED.
-  // opts: { canAct, controls, pending, notice, error }
+  // Hunger and condition, and for the owner one feeding panel: the Fodder on
+  // hand with FEED, then the Marketplace food they hold as extras. opts:
+  // { canAct, controls, pending, notice, error }
   function feedingSection(c, opts) {
     opts = opts || {};
     var k = c.care || { hunger: care.HUNGER_MAX, hungerState: 'WELL_FED', hungerLabel: 'WELL FED', condition: 'GOOD' };
@@ -186,6 +164,14 @@
       var short = ctl && fodder < care.FEED_FODDER_COST;
       var busy = !!opts.pending;
       var why = !ctl ? '' : full ? 'Already Full' : short ? 'Need ' + care.FEED_FODDER_COST + ' Fodder' : '';
+      var owned = (ctl && ctl.food) || {};
+      var have = foods.FOODS.filter(function (f) { return Number(owned[f.id]) > 0; });
+      var foodButtons = have.map(function (f) {
+        var pending = opts.pending === 'feed:' + f.id;
+        return '<button type="button" class="btn-secondary" data-action="feed-food" data-food="' + f.id + '"' + (full || busy ? ' disabled' : '') + '>' +
+          (pending ? 'FEEDING…' : f.name.toUpperCase() + ' ×' + Number(owned[f.id])) + '</button>';
+      }).join('');
+      var n = opts.notice;
       rows +=
         '<li class="list-row flex-col items-stretch gap-3" data-feeding>' +
           '<span class="flex items-baseline justify-between gap-3">' +
@@ -195,10 +181,15 @@
           '<p class="text-small text-muted">Feeding uses ' + care.FEED_FODDER_COST + ' Fodder for +' + care.FEED_HUNGER_RESTORE + ' Hunger. Farmers bring Fodder home from Work.</p>' +
           '<button type="button" class="btn-primary" data-action="feed"' + (!ctl || full || short || busy ? ' disabled' : '') + '>' +
             (opts.pending === 'feed' ? 'FEEDING…' : 'FEED') + '</button>' +
+          '<span class="flex flex-col items-stretch gap-2" data-food-feeding>' +
+            (have.length
+              ? '<span class="flex flex-wrap gap-2">' + foodButtons + '</span>'
+              : (ctl ? '<p class="text-small text-muted" data-food-empty>No food yet.</p>' : '')) +
+            '<a href="/marketplace" data-nav class="text-small font-bold underline decoration-punk underline-offset-4" data-food-market-link>Buy food in the Marketplace.</a>' +
+          '</span>' +
           (why ? '<p class="text-small font-bold text-muted" data-feed-blocked>' + why + '</p>' : '') +
-          (opts.notice && opts.notice.kind === 'fed' && !opts.notice.food ? '<p class="text-small font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p>' : '') +
-        '</li>' +
-        foodRow(k, opts);
+          (n && n.kind === 'fed' ? '<p class="text-small font-bold text-accent" role="status" data-care-notice>' + noticeText(n) + '</p>' : '') +
+        '</li>';
     }
     return '<section data-hunger-section><h3 class="section-label">Hunger</h3><ul class="list">' + rows + '</ul></section>';
   }
