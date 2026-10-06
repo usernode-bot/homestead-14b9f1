@@ -11,7 +11,7 @@
     // Seeds still waiting to be awakened.
     MAX_OWNED_CREATURES: 10,
     // What one Genesis costs, in STEAD (a GENESIS ledger entry).
-    GENESIS_COST: 5000,
+    GENESIS_COST: 500,
   });
 
   if (typeof module === 'object' && module.exports) module.exports = config;

@@ -54,7 +54,7 @@ test('Genesis, Seed and Awaken', { skip: !url && 'DATABASE_URL is not set' }, as
     assert.deepStrictEqual(await genesis.getState(pool, null), { genesis: null, slots: null, seed: null, creature: null, history: null });
   });
 
-  await t.test('Genesis spends 5,000 STEAD on one dormant Seed, which takes a place', async () => {
+  await t.test('Genesis spends 500 STEAD on one dormant Seed, which takes a place', async () => {
     await reset();
     await pay('ut1alice', GENESIS_COST);
     const m = await genesis.mint(pool, 'ut1alice', 7);

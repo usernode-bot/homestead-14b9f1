@@ -43,8 +43,8 @@
     {
       "name": "Home's Genesis shows its cost in STEAD",
       "path": "/",
-      "expectSelector": "#genesis [data-genesis-cost=\"5000\"]",
-      "expectText": "5,000 STEAD"
+      "expectSelector": "#genesis [data-genesis-cost=\"500\"]",
+      "expectText": "500 STEAD"
     },
     {
       "name": "Home shows the Daily Check-in seven day schedule",
