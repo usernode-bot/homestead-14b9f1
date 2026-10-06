@@ -28,6 +28,12 @@
       "expectText": "CONNECT"
     },
     {
+      "name": "Home shows a How to play guide with six steps",
+      "path": "/",
+      "expectSelector": "#how-to-play summary + div [data-how-to-play-steps] li:nth-child(6)",
+      "expectText": "How to play"
+    },
+    {
       "name": "Home shows Genesis with GENESIS MINT",
       "path": "/",
       "expectSelector": "#genesis [data-action=\"genesis-mint\"]",

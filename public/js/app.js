@@ -147,6 +147,12 @@
     if (id && store.get().viewedCreature.id === id && store.get().viewedCreature.status === 'ready') creatures.view(id, true, true);
   }
 
+  // Whether Home's How to play is open, so a re-render doesn't close it.
+  var howToPlayOpen = false;
+  document.addEventListener('toggle', function (e) {
+    if (e.target && e.target.id === 'how-to-play') howToPlayOpen = e.target.open;
+  }, true);
+
   function render() {
     var route = currentRoute();
     // Starts the load (which re-renders) only when this Creature isn't showing.
@@ -174,6 +180,8 @@
     var focusId = focused ? focused.id : null;
     var selection = focused && typeof focused.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd] : null;
     viewEl.innerHTML = screens.render[route.key](state, route);
+    var guide = document.getElementById('how-to-play');
+    if (guide) guide.open = howToPlayOpen;
     fillFields(state);
     contestView.fill(viewEl);
     if (route.key === 'marketplace') market.fillForm(viewEl);
