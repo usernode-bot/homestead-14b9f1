@@ -28,6 +28,8 @@
     // What the person typed goes back in as a value, never as HTML.
     var input = root.querySelector('#contest-opponent');
     if (input && window.HOMESTEAD_CONTESTS) input.value = window.HOMESTEAD_CONTESTS.form().opponent || '';
+    // An open list of player suggestions goes back under the new field.
+    if (input && window.HOMESTEAD_USER_SUGGEST) window.HOMESTEAD_USER_SUGGEST.restore();
   }
   function reset() { texts = []; }
 
@@ -95,7 +97,7 @@
         '<form id="contest-challenge-form" class="mt-4 grid gap-4" novalidate>' +
           '<div>' + creaturePicker('contest-creature', 'creatureId', s.creatures, chosen, 'Your Creature') + '</div>' +
           '<div><label for="contest-opponent" class="block text-small text-muted">Opponent</label>' +
-            '<input id="contest-opponent" class="field mt-1" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="@username or ut1… wallet address" data-contest-input="opponent" data-keep-value>' +
+            '<div class="relative"><input id="contest-opponent" class="field mt-1" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="@username or ut1… wallet address" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="contest-opponent-suggestions" data-contest-input="opponent" data-keep-value></div>' +
             '<p class="mt-1 text-small text-muted">Their Homeroom username, or the wallet address that owns their Creature.</p></div>' +
           '<div><button type="submit" class="btn-primary" data-action="contest-send"' + (busy || !free.length ? ' disabled' : '') + '>' + (busy ? 'SENDING…' : 'SEND CHALLENGE') + '</button>' +
             (!free.length ? '<p class="mt-2 text-small text-muted">All your Creatures are busy right now.</p>' : '') + '</div>' +
