@@ -1,4 +1,7 @@
 {
+  "icon": {
+    "image": "brand/icon.png"
+  },
   "description": "Collectible game where you raise, train, and battle cute little monsters in your homestead",
   "secrets": [],
   "governance": {
