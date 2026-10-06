@@ -272,5 +272,9 @@
       "expectSelector": "[data-creature-profile] [data-contest-section] [data-contest-availability]",
       "expectText": "Contests"
     }
-  ]
+  ],
+  "visibility": {
+    "build": "public",
+    "view": "public"
+  }
 }
