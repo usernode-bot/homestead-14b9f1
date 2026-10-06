@@ -39,7 +39,7 @@
     { path: '/creature', key: 'creature', label: 'CREATURE', title: 'MY CREATURE', group: 'mine' },
     { path: '/homestead', key: 'homestead', label: 'HOMESTEAD', group: 'mine' },
     { path: '/collection', key: 'collection', label: 'COLLECTION', group: 'mine' },
-    { path: '/contests', key: 'contests', label: 'CONTESTS' },
+    { path: '/contests', key: 'contests', label: 'BATTLE' },
     { path: '/marketplace', key: 'marketplace', label: 'MARKETPLACE' },
     { path: '/profile', key: 'profile', label: 'PROFILE', header: true },
   ];
@@ -552,7 +552,7 @@
     return contestView.page(state, pageHeading(route));
   }
   function contestById(state, route) {
-    return contestView.detail(state, pageHeading({ key: 'contests', label: 'CONTEST' }));
+    return contestView.detail(state, pageHeading({ key: 'contests', label: 'BATTLE' }));
   }
   // The Marketplace, /marketplace: players' Resource listings, and food
   // bought with STEAD. The foods and prices come from food-config.js, so

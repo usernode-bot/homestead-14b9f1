@@ -154,8 +154,9 @@ transactions do not exist yet, and none may be faked.
   now. Slots, stats and the catalog are only in `public/js/gear-config.js`;
   care-config.js `gearBonus` adds equipped Gear into `effectiveStat`.
 - **Contests:** player-vs-player head-to-head play, built as a non-violent
-  trick-off (content rules: never "battle", "attack" as an action, "damage" or
-  "defeated" in copy). `lib/contests.js` owns it: a challenge
+  trick-off (content rules: never "attack" as an action, "damage" or
+  "defeated" in copy; "battle" only as the menu label and page heading BATTLE,
+  by the owner's request, and the play itself stays a trick-off). `lib/contests.js` owns it: a challenge
   (`contest_challenges`) is between two different wallets and moves once
   from PENDING (trigger), under a row lock, so two tabs or a cancel racing an
   accept end in one state. Accepting creates the one Contest for it
