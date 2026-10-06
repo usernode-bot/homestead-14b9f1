@@ -103,6 +103,23 @@
     @apply flex min-h-11 items-center gap-3 px-4 py-3;
   }
 
+  /* A row that opens and closes the rest of its <details>:
+     <details class="list"><summary class="list-row disclosure">. The
+     chevron (.disclosure-chevron) turns while it is open. */
+  .disclosure {
+    @apply cursor-pointer list-none select-none font-bold hover:bg-raised
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus;
+  }
+  .disclosure::-webkit-details-marker {
+    display: none;
+  }
+  .disclosure-chevron {
+    @apply ml-auto h-5 w-5 shrink-0 text-muted transition-transform motion-reduce:transition-none;
+  }
+  details[open] > .disclosure .disclosure-chevron {
+    @apply rotate-180;
+  }
+
   /* A card: one self-contained thing, usually something you tap. Most
      screens need none. Never put a card inside a card or a .list. */
   .card {

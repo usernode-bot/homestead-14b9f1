@@ -25,6 +25,7 @@
     profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     gear: '<path d="M8 7V5a4 4 0 0 1 8 0v2"/><rect x="4" y="7" width="16" height="14" rx="3"/><path d="M9 13h6"/>',
+    chevron: '<path d="M6 9l6 6 6-6"/>',
     contests: '<path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>',
   };
   function icon(name, cls) {
@@ -394,6 +395,35 @@
     return '<span class="font-black tabular-nums" data-profile-stead="' + s.steadBalance + '">' + steadAmount(s.steadBalance) + '</span>';
   }
 
+  // How to play: the goal and the core loop, closed until opened so it never
+  // pushes Genesis and the Daily Check-in down. app.js keeps it open across
+  // re-renders. Every number comes from the config files.
+  function howToPlay() {
+    var contestConfig = window.HOMESTEAD_CONTEST_CONFIG;
+    var rewards = steadConfig.CHECKIN_REWARDS;
+    var steps = [
+      ['Connect your wallet', 'Tap CONNECT at the top. Your Creatures and STEAD belong to your Homeroom wallet.'],
+      ['Check in every day', 'Daily Check-in pays ' + steadConfig.format(rewards[0]) + ' to ' + steadAmount(rewards[rewards.length - 1]) + ', more for each day in a row.'],
+      ['Awaken a Creature', 'Genesis costs ' + steadAmount(GENESIS_COST) + ' and gives you a Seed. Awaken it into a Creature with its own Species, rarity, stats and Trade.'],
+      ['Send it to work', 'In MY HOMESTEAD, your Creature works at its Trade\'s building and brings home Resources. Sell spare Resources in the MARKETPLACE.'],
+      ['Make it stronger', 'Feed it to keep it working well, train its stats with STEAD and equip Gear.'],
+      ['Compete in BATTLE', 'Challenge another player to a trick-off. Win for ' + steadAmount(contestConfig.WIN_REWARD) + ', or get ' + steadAmount(contestConfig.LOSS_REWARD) + ' for taking part.'],
+    ];
+    return '<details class="list" id="how-to-play">' +
+      '<summary class="list-row disclosure">' + icon('creature', 'h-5 w-5 shrink-0 text-punk') + '<span class="text-body">How to play</span>' + icon('chevron', 'disclosure-chevron') + '</summary>' +
+      '<div class="px-4 py-3">' +
+        '<p class="text-body"><span class="font-bold">Goal:</span> collect up to ' + fmt(MAX_OWNED) + ' Creatures and raise them into the strongest punks around.</p>' +
+        '<ol class="mt-3 space-y-3" data-how-to-play-steps>' + steps.map(function (st, i) {
+          return '<li class="flex items-start gap-3">' +
+            '<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-raised text-small font-black text-punk tabular-nums" aria-hidden="true">' + (i + 1) + '</span>' +
+            '<p class="text-body"><span class="font-bold">' + st[0] + '.</span> <span class="text-muted">' + st[1] + '</span></p>' +
+          '</li>';
+        }).join('') + '</ol>' +
+        '<p class="mt-3 text-small text-muted">The loop: check in and compete for STEAD, work for Resources, then spend them to make your Creatures stronger and grow your collection.</p>' +
+      '</div>' +
+    '</details>';
+  }
+
   function home(state) {
     return '' +
       '<section class="grid items-center gap-8 py-4 md:grid-cols-5 md:py-10">' +
@@ -408,7 +438,8 @@
         // This wallet's Creatures, out of the most one wallet can hold.
         '<div class="md:col-span-2">' + creatureCountCard(state) + '</div>' +
       '</section>' +
-      '<div class="mt-4 max-w-2xl">' + genesisPanel(state) + '</div>' +
+      '<div class="mt-4 max-w-2xl">' + howToPlay() + '</div>' +
+      '<div class="mt-6 max-w-2xl">' + genesisPanel(state) + '</div>' +
       '<div class="mt-10 max-w-2xl">' + checkInCard(state) + '</div>' +
       '<section class="mt-10 max-w-2xl">' +
         '<h2 class="section-label">About the game</h2>' +
