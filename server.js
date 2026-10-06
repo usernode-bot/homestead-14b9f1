@@ -506,6 +506,36 @@ app.post('/api/marketplace/buy', async (req, res) => {
   }
 });
 
+// Players selling each other Resources from Work (lib/marketplace.js). Anyone
+// can see what is for sale; listing, buying and cancelling are for the wallet
+// the platform's verified token links to this account. A listing sells once:
+// a second buyer is refused with already_sold, and the same buyer's retry is
+// answered with the current state (replayed: true), paying nothing twice.
+app.post('/api/marketplace/listings', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const body = req.body || {};
+  try {
+    res.json(await marketplace.createListing(pool, wallet, req.user.username, {
+      resource: body.resource, quantity: body.quantity, price: body.price, requestId: body.requestId,
+    }, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+app.post('/api/marketplace/listings/:id/:action(buy|cancel)', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  try {
+    res.json(req.params.action === 'buy'
+      ? await marketplace.buyListing(pool, wallet, req.user.username, req.params.id, req.now)
+      : await marketplace.cancelListing(pool, wallet, req.params.id, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
 // Contests (lib/contests.js): one player challenges another, each with one
 // of their own Creatures. Every write is for the wallet the platform's
 // verified token links to this account, and answers with the whole Contests
@@ -739,6 +769,21 @@ async function seedStagingContest() {
   await contests.accept(pool, b.wallet, b.user, sent.challenge.challengeId, ids[1], at, { contestId: STAGING_DEMO_CONTEST_ID });
 }
 
+// Two Resource listings from a fake seller (the second contest wallet), so
+// the Marketplace shows Resources for sale. Its storage is given the Resources
+// once, then they are listed through the real path. Never the visitor's.
+async function seedStagingMarket() {
+  const seller = STAGING_CONTEST_WALLETS[1];
+  const listed = await pool.query('SELECT 1 FROM market_listings WHERE seller = $1 LIMIT 1', [seller.wallet]);
+  if (listed.rows.length) return;
+  const opened = await homestead.open(pool, seller.wallet);
+  if (!opened.homestead) return;
+  const storage = Object.assign(require('./public/js/homestead-config').emptyStorage(), { wood: 12, crystal: 1 });
+  await pool.query('UPDATE homesteads SET storage = $2 WHERE id = $1', [opened.homestead.homesteadId, JSON.stringify(storage)]);
+  await marketplace.createListing(pool, seller.wallet, seller.user, { resource: 'wood', quantity: 12, price: 30, requestId: 'staging-listing-1' }, new Date());
+  await marketplace.createListing(pool, seller.wallet, seller.user, { resource: 'crystal', quantity: 1, price: 75, requestId: 'staging-listing-2' }, new Date());
+}
+
 async function start() {
   // Each game system adds its own idempotent CREATE TABLE IF NOT EXISTS here.
   await genesis.ensureSchema(pool);
@@ -752,6 +797,7 @@ async function start() {
   await contests.ensureSchema(pool);
   if (IS_STAGING) await seedStaging().catch((err) => console.warn('[staging seed]', err.message));
   if (IS_STAGING) await seedStagingContest().catch((err) => console.warn('[staging contest seed]', err.message));
+  if (IS_STAGING) await seedStagingMarket().catch((err) => console.warn('[staging market seed]', err.message));
   server = app.listen(port, () => console.log(`Listening on :${port}`));
   // Let Envoy retire idle upstream connections at 60s, with a 15s margin.
   server.keepAliveTimeout = 75_000;

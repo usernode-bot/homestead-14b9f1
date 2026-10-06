@@ -19,13 +19,15 @@ test('STEAD config', () => {
   assert.strictEqual(cfg.addDays('2026-03-01', -1), '2026-02-28');
   assert.strictEqual(cfg.formatSigned(1240), '+1,240');
   assert.strictEqual(cfg.formatSigned(-50), '-50');
-  // Daily Check-in, Training, Contest rewards, Genesis and Marketplace
-  // purchases are live; the rest are reserved, spending types.
+  // Daily Check-in, Training, Contest rewards, Genesis, Marketplace
+  // purchases and Resource trades are live; the rest are reserved, spending
+  // types.
   const active = Object.keys(cfg.TYPES).filter((k) => cfg.TYPES[k].active);
-  assert.deepStrictEqual(active, ['DAILY_CHECKIN', 'TRAINING', 'CONTEST_REWARD', 'GENESIS', 'MARKETPLACE_PURCHASE']);
-  for (const k of ['TRAINING', 'GENESIS', 'MARKETPLACE_PURCHASE', 'FEEDING', 'GEAR', 'UPGRADE', 'MARKETPLACE_FEE', 'BREEDING']) {
+  assert.deepStrictEqual(active, ['DAILY_CHECKIN', 'TRAINING', 'CONTEST_REWARD', 'GENESIS', 'MARKETPLACE_PURCHASE', 'RESOURCE_PURCHASE', 'RESOURCE_SALE']);
+  for (const k of ['TRAINING', 'GENESIS', 'MARKETPLACE_PURCHASE', 'RESOURCE_PURCHASE', 'FEEDING', 'GEAR', 'UPGRADE', 'MARKETPLACE_FEE', 'BREEDING']) {
     assert.strictEqual(cfg.TYPES[k].direction, 'debit', k);
   }
+  assert.strictEqual(cfg.TYPES.RESOURCE_SALE.direction, 'credit');
 });
 
 test('check-in state: claimable, claimed, continued, missed and looping', () => {

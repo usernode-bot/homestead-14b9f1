@@ -127,9 +127,17 @@
       "impact": [
         "public/js/marketplace.js",
         "public/js/food-config.js",
+        "public/js/market-config.js",
+        "lib/marketplace.js",
         "public/js/screens.js",
         "styles/**"
       ]
+    },
+    {
+      "name": "Marketplace shows players' Resource listings with their STEAD price and seller",
+      "path": "/marketplace",
+      "expectSelector": "[data-market-listings] [data-listing][data-listing-resource=\"wood\"] [data-listing-price=\"30\"]",
+      "expectText": "Sold by @staging-demo-rival"
     },
     {
       "name": "Collection placeholder",

@@ -83,9 +83,9 @@ placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). PR #3 made
 the Creature a full collectible (below). PR #4 added the Homestead; PR #5 Work
 & Resources (below); PR #6 STEAD Points and Daily Check-in (below); PR #7
 Feeding + Training (below); PR #8 Gear (below); PR #9 Contests (below); then
-Marketplace food (below). Creature listings, breeding, Gear crafting or
-trading, other STEAD spending and transactions do not exist yet, and none may
-be faked.
+Marketplace food (below); then Resource trading between players (below).
+Creature listings, breeding, Gear crafting or trading, other STEAD spending and
+transactions do not exist yet, and none may be faked.
 
 - **Genesis:** `lib/genesis.js` holds every rule, enforced in Postgres
   transactions. Genesis is repeatable for `GENESIS_COST` STEAD each
@@ -179,6 +179,16 @@ be faked.
   Hunger; a hold (Punk Feast) stores full Hunger as of a moment still to
   come, so `currentHunger` counts no loss until then. Food can't be sold,
   given or refunded.
+- **Resource trading:** players sell each other the Resources Work brings
+  home, for STEAD (`lib/marketplace.js`, `market_listings`). Listing takes the
+  lot out of the seller's storage under a lock on their Homestead; a listing
+  moves once from active to sold or cancelled (trigger) and never changes
+  what it sells. Buying locks the listing, the buyer's Homestead, then both
+  STEAD accounts in sorted order, and pays through `debitStead`
+  (RESOURCE_PURCHASE) and `creditStead` (RESOURCE_SALE), both keyed
+  `LISTING-<id>`. Own listings, too little STEAD, no storage room and sold
+  listings are refused with nothing changed; cancelling returns the lot to
+  storage. No fee. Limits are only in `public/js/market-config.js`.
 - **Ownership cap:** a wallet owns at most `MAX_OWNED_CREATURES` (10),
   counted on the server from current ownership plus Seeds waiting to be
   awakened. There is no global Creature cap and none may be added. Every

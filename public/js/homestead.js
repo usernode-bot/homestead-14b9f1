@@ -198,5 +198,11 @@
     if (v.id != null && state.wallet.status !== 'connecting') view(v.id, true); // whether you own it may have changed
   });
 
-  window.HOMESTEAD_HOMESTEADS = { open: open, view: view, startWork: startWork, collect: collect, collectPending: collectPending };
+  // Its storage changed somewhere else (a Marketplace sale): open it again
+  // the next time the Homestead screen shows.
+  function forget() {
+    if (store.get().homestead.key) store.update('homestead', { key: null });
+  }
+
+  window.HOMESTEAD_HOMESTEADS = { open: open, view: view, startWork: startWork, collect: collect, collectPending: collectPending, forget: forget };
 })();
