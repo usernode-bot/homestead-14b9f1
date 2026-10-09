@@ -52,7 +52,7 @@
       art(c, 'aspect-square w-full') +
       '<span class="mt-3 block truncate text-heading font-black">' + nameSpan(c) + '</span>' +
       '<span class="mt-0.5 block text-small text-muted">' + label(cfg.SPECIES, c.species) + '</span>' +
-      '<span class="mt-2 flex items-center justify-between gap-2">' + rarityBadge(c) +
+      '<span class="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">' + rarityBadge(c) +
         '<span class="whitespace-nowrap text-small font-bold tabular-nums">Lv. ' + Number(c.level) + '</span></span>';
     var attrs = ' data-creature-card="' + Number(c.creatureId) + '"';
     return opts.href

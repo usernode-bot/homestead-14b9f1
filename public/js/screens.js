@@ -67,8 +67,8 @@
     return '<h1 class="mb-3 flex items-center gap-3 text-title font-black tracking-tight">' +
         '<span class="flex h-10 w-10 items-center justify-center rounded-xl bg-raised text-punk">' + icon('homestead') + '</span>' +
         'MY HOMESTEAD</h1>' +
-      '<nav aria-label="My Homestead" class="-mx-1 mb-6 overflow-x-auto px-1 py-1">' +
-        '<ul class="flex gap-1" data-mine-tabs>' +
+      '<nav aria-label="My Homestead" class="-mx-1 mb-6 px-1 py-1">' +
+        '<ul class="flex flex-wrap gap-1" data-mine-tabs>' +
           MINE_TABS.map(function (r) {
             return '<li><a href="' + r.path + '" data-nav class="nav-tab" data-mine-tab="' + r.key + '"' + (r.key === activeKey ? ' aria-current="page"' : '') + '>' + r.label + '</a></li>';
           }).join('') +
