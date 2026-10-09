@@ -242,7 +242,7 @@
       }
       return '<li class="list-row flex-wrap gap-x-4 gap-y-2" data-training-stat="' + s.key + '">' +
         '<span class="w-20 shrink-0 text-small font-bold">' + s.label.toUpperCase() + '</span>' +
-        '<dl class="grid min-w-60 flex-1 grid-cols-4 gap-2 text-small">' +
+        '<dl class="grid min-w-0 flex-1 grid-cols-2 gap-2 text-small sm:grid-cols-4">' +
           '<div><dt class="text-muted">Base</dt><dd class="font-bold tabular-nums" data-stat="' + s.key + '">' + base + '</dd></div>' +
           '<div><dt class="text-muted">Training</dt><dd class="font-bold tabular-nums" data-training-bonus="' + s.key + '">+' + b + '</dd></div>' +
           '<div><dt class="text-muted">Gear</dt><dd class="tabular-nums' + (gb ? ' font-bold' : ' text-muted') + '" data-gear-bonus="' + s.key + '">+' + gb + '</dd></div>' +
