@@ -66,8 +66,6 @@
           : '') +
         '</a></li>';
     }).join('');
-    var active = navEl.querySelector('[aria-current="page"]');
-    if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
   // The header's one button: the player's Homeroom username, opening their

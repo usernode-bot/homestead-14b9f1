@@ -83,7 +83,7 @@
 </head>
 <body class="min-h-screen bg-ground text-fg antialiased">
   <!-- The header: wordmark, wallet, and the screens. On small screens
-       the tabs become a sideways-scrolling strip under the wordmark. -->
+       the tabs wrap onto further rows under the wordmark. -->
   <header class="sticky top-0 z-20 border-b border-line bg-ground/95 backdrop-blur" style="padding-top: var(--un-safe-inset-top, env(safe-area-inset-top, 0px))">
     <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 xl:flex-nowrap">
       <a href="/" data-nav class="flex min-h-11 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" aria-label="HOMESTEAD home">
@@ -98,8 +98,8 @@
       <!-- One button: the signed-in player's name, opening their profile
            (wallet and STEAD live there), or CONNECT with no wallet. -->
       <div id="wallet" class="relative ml-auto xl:order-last"></div>
-      <nav aria-label="Main" class="order-last w-full min-w-0 overflow-x-auto xl:order-none xl:w-auto xl:flex-1 xl:overflow-visible">
-        <ul id="nav" class="flex gap-1"></ul>
+      <nav aria-label="Main" class="order-last w-full min-w-0 xl:order-none xl:w-auto xl:flex-1">
+        <ul id="nav" class="flex flex-wrap gap-1"></ul>
       </nav>
     </div>
   </header>
