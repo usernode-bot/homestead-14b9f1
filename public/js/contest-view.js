@@ -138,7 +138,8 @@
             '<button type="button" class="btn-secondary" data-action="contest-accept-start" data-challenge-id="' + id + '"' + (busy ? ' disabled' : '') + '>ACCEPT</button>' +
             '<button type="button" class="btn-secondary" data-action="contest-decline" data-challenge-id="' + id + '"' + (busy ? ' disabled' : '') + '>' + (s.pending === 'decline:' + id ? 'DECLINING…' : 'DECLINE') + '</button>' +
           '</div>';
-      return '<li class="list-row flex-col items-stretch gap-3" data-challenge="' + id + '">' + head + actions + '</li>';
+      var expiry = '<p class="text-small text-muted" data-challenge-expiry>Answer within ' + cfg.CHALLENGE_EXPIRES_HOURS + ' hours. If nobody does, the challenge expires: nothing is lost and no ' + steadConfig.NAME + ' is taken.</p>';
+      return '<li class="list-row flex-col items-stretch gap-3" data-challenge="' + id + '">' + head + expiry + actions + '</li>';
     }).join('') + '</ul></section>';
   }
 
@@ -204,6 +205,7 @@
     return '<section class="mt-8"><h2 class="section-label">How contests work</h2><ul class="list">' +
       '<li class="list-row"><p class="text-body">The Creatures take turns showing off a trick. Keeping up costs the rival Stamina: the trickster\'s Attack minus the rival\'s Defense, at least ' + cfg.MIN_POINTS + '.</p></li>' +
       '<li class="list-row"><p class="text-body">Higher Speed goes first. Luck gives a chance of a show-stopper worth ' + cfg.CRIT_MULTIPLIER + ' times the points. Condition counts: Good 100%, Fair ' + Math.round(cfg.CONDITION_MULTIPLIER.FAIR * 100) + '%, Poor ' + Math.round(cfg.CONDITION_MULTIPLIER.POOR * 100) + '%.</p></li>' +
+      '<li class="list-row"><p class="text-body">A challenge waits ' + cfg.CHALLENGE_EXPIRES_HOURS + ' hours for an answer. If it isn\'t accepted by then it expires: nothing is spent, no ' + steadConfig.NAME + ' is lost and both Creatures stay free.</p></li>' +
       '<li class="list-row"><p class="text-body">Stats are saved when a challenge is accepted. For ' + cfg.CONTEST_DURATION_SECONDS + ' seconds both Creatures can\'t work, train or change Gear, then the result is in.</p></li>' +
       '<li class="list-row"><p class="text-body">The winner gets ' + stead(cfg.WIN_REWARD) + ', the other player ' + stead(cfg.LOSS_REWARD) + '. Nobody loses a Creature and no stats change.</p></li>' +
     '</ul></section>';
@@ -307,7 +309,7 @@
         '</ul>';
     } else {
       top = '<p class="mt-6 text-center text-body" role="status" data-contest-running>Contest in progress. Result in ' + countdown(c.endsAt, v.clockOffset) + '.</p>' +
-        '<p class="mt-1 text-center text-small text-muted">Both Creatures are locked to this contest until then.</p>';
+        '<p class="mt-1 text-center text-small text-muted">Both Creatures are locked to this contest until then. When the time is up, the result is in and ' + steadConfig.NAME + ' is paid: ' + stead(cfg.WIN_REWARD) + ' to the winner, ' + stead(cfg.LOSS_REWARD) + ' to the other player.</p>';
     }
     var log = done
       ? '<section class="mt-8"><h2 class="section-label">Contest log</h2><ol class="list" data-contest-log>' + c.log.map(function (e) {
