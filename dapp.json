@@ -47,6 +47,15 @@
       "expectText": "5,000 STEAD"
     },
     {
+      "name": "Home ends with About the game, with room above the bottom bar",
+      "path": "/",
+      "expectSelector": "main#view[style*=\"6rem\"] > section:last-child .list",
+      "expectText": "punk monsters",
+      "impact": [
+        "public/**"
+      ]
+    },
+    {
       "name": "Home shows the Daily Check-in seven day schedule",
       "path": "/",
       "expectSelector": "#daily-check-in [data-check-in-day=\"7\"]",
