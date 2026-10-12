@@ -147,15 +147,21 @@
       "expectText": "Sold by @staging-demo-rival"
     },
     {
-      "name": "Marketplace has a row for every Homestead Resource, listed or not",
+      "name": "Marketplace puts a player's Wood listing under Lumber Camp",
       "path": "/marketplace",
-      "expectSelector": "[data-market-listings] [data-market-resource=\"grain\"] ~ [data-market-resource=\"rune\"][data-listing-count=\"0\"]",
-      "expectText": "None for sale"
+      "expectSelector": "[data-market-listings] [data-market-category=\"lumber-camp\"] [data-market-resource=\"wood\"] [data-listing-resource=\"wood\"] [data-listing-price=\"30\"]",
+      "expectText": "Lumber Camp"
     },
     {
-      "name": "Marketplace sells a pack of every Resource from the app",
+      "name": "Marketplace lists every Resource for sale under its category, listed or not",
       "path": "/marketplace",
-      "expectSelector": "[data-market-packs] [data-pack=\"grain\"] ~ [data-pack=\"rune\"] [data-pack-price=\"50\"]",
+      "expectSelector": "[data-market-listings] [data-market-category=\"mystic-shrine\"] [data-market-resource=\"rune\"][data-listing-count=\"0\"]",
+      "expectText": "Mystic Shrine"
+    },
+    {
+      "name": "Marketplace sells a pack of every Resource from the app, grouped by category",
+      "path": "/marketplace",
+      "expectSelector": "[data-market-packs] [data-market-category=\"mystic-shrine\"] [data-pack=\"rune\"] [data-pack-price=\"50\"]",
       "expectText": "Resource packs"
     },
     {
