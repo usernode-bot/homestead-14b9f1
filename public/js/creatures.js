@@ -101,17 +101,19 @@
     afterCare(kind);
   }
 
-  // What else a Feed or Train changed: storage (Fodder), Marketplace food or
-  // the STEAD balance.
+  // What else a Feed or Train changed: storage (Fodder, or Training's
+  // Resources), Marketplace food or the STEAD balance.
   function afterCare(kind) {
     if (kind.indexOf('feed:') === 0) {
       if (window.HOMESTEAD_MARKETPLACE) window.HOMESTEAD_MARKETPLACE.forget();
-    } else if (kind === 'feed') {
-      // The Homestead reloads its storage next time it is opened.
-      if (store.get().homestead.status === 'ready') store.update('homestead', { key: null });
-    } else if (window.HOMESTEAD_STEAD) {
-      window.HOMESTEAD_STEAD.load();
+      return;
     }
+    // The Homestead reloads its storage next time it is opened.
+    if (store.get().homestead.status === 'ready') store.update('homestead', { key: null });
+    if (kind === 'feed') return;
+    // Training also spent STEAD, and the Marketplace shows storage and STEAD.
+    if (window.HOMESTEAD_STEAD) window.HOMESTEAD_STEAD.load();
+    if (window.HOMESTEAD_MARKETPLACE) window.HOMESTEAD_MARKETPLACE.forget();
   }
 
   // With Fodder, or with `food`, a food bought in the Marketplace.
@@ -125,7 +127,8 @@
   function train(stat) {
     var v = store.get().viewedCreature;
     return careRequest('train:' + stat, '/api/creatures/' + Number(v.id) + '/train', { stat: stat }, function (data) {
-      return { kind: 'trained', stat: data.trained.stat, amount: data.trained.amount, cost: data.trained.cost };
+      var t = data.trained;
+      return { kind: 'trained', stat: t.stat, amount: t.amount, cost: t.cost, resourcesSpent: t.resourcesSpent || null, levelBefore: t.levelBefore, levelAfter: t.levelAfter };
     });
   }
 

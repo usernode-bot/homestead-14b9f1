@@ -207,6 +207,8 @@ test('Gear in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
     await gear.equip(pool, 'ut1alice', c.creatureId, g['moon-hammer'], 'tool');
     await homestead.open(pool, 'ut1alice');
     await stead.creditStead(pool, 'ut1alice', 100, 'DAILY_CHECKIN', {}, { key: 'setup' });
+    // Training spends Resources too.
+    await pool.query(`UPDATE homesteads SET storage = storage || '{"ore": 2, "stone": 2}'::jsonb WHERE owner = $1`, ['ut1alice']);
     const T0 = new Date('2026-10-05T10:00:00Z');
     await pool.query('UPDATE creatures SET hunger = 50, hunger_updated_at = $2 WHERE id = $1', [c.creatureId, T0]);
 
