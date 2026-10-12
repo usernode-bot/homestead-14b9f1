@@ -234,10 +234,10 @@
       "expectText": "Condition"
     },
     {
-      "name": "A Creature's profile shows the Feed section under Hunger",
+      "name": "A Creature's profile stacks its sections in one column, Hunger before Identity",
       "path": "/creature/1",
-      "expectSelector": "[data-creature-profile] [data-hunger-section] ~ [data-feeding]",
-      "expectText": "FEED FODDER"
+      "expectSelector": "[data-creature-profile] [data-hunger-section] ~ [data-identity-section]",
+      "expectText": "Identity"
     },
     {
       "name": "A Creature's profile shows base, training and effective stats",
