@@ -153,6 +153,12 @@
       "expectText": "None for sale"
     },
     {
+      "name": "Marketplace sells a pack of every Resource from the app",
+      "path": "/marketplace",
+      "expectSelector": "[data-market-packs] [data-pack=\"grain\"] ~ [data-pack=\"rune\"] [data-pack-price=\"50\"]",
+      "expectText": "Resource packs"
+    },
+    {
       "name": "Collection placeholder",
       "path": "/collection",
       "expectSelector": "[data-empty=\"collection\"]",

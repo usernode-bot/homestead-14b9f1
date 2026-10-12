@@ -489,7 +489,7 @@ app.post('/api/stead/check-in', async (req, res) => {
 // and charges nothing a second time.
 app.get('/api/marketplace', async (req, res) => {
   try {
-    res.json(await marketplace.getState(pool, genesisWallet(req)));
+    res.json(await marketplace.getState(pool, genesisWallet(req), req.now));
   } catch (err) {
     sendGenesisError(res, err);
   }
@@ -501,6 +501,20 @@ app.post('/api/marketplace/buy', async (req, res) => {
   const body = req.body || {};
   try {
     res.json(await marketplace.buy(pool, wallet, body.foodId, body.requestId, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
+// Resource packs bought from the app (lib/marketplace.js buyPack): one pack
+// per purchase, at most market-config.js perDay a game day. requestId works
+// as it does for food.
+app.post('/api/marketplace/resource-packs/buy', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const body = req.body || {};
+  try {
+    res.json(await marketplace.buyPack(pool, wallet, body.resource, body.requestId, req.now));
   } catch (err) {
     sendGenesisError(res, err);
   }

@@ -20,11 +20,11 @@ test('STEAD config', () => {
   assert.strictEqual(cfg.formatSigned(1240), '+1,240');
   assert.strictEqual(cfg.formatSigned(-50), '-50');
   // Daily Check-in, Training, Contest rewards, Genesis, Marketplace
-  // purchases and Resource trades are live; the rest are reserved, spending
-  // types.
+  // purchases, Resource trades and Resource packs are live; the rest are
+  // reserved, spending types.
   const active = Object.keys(cfg.TYPES).filter((k) => cfg.TYPES[k].active);
-  assert.deepStrictEqual(active, ['DAILY_CHECKIN', 'TRAINING', 'CONTEST_REWARD', 'GENESIS', 'MARKETPLACE_PURCHASE', 'RESOURCE_PURCHASE', 'RESOURCE_SALE']);
-  for (const k of ['TRAINING', 'GENESIS', 'MARKETPLACE_PURCHASE', 'RESOURCE_PURCHASE', 'FEEDING', 'GEAR', 'UPGRADE', 'MARKETPLACE_FEE', 'BREEDING']) {
+  assert.deepStrictEqual(active, ['DAILY_CHECKIN', 'TRAINING', 'CONTEST_REWARD', 'GENESIS', 'MARKETPLACE_PURCHASE', 'RESOURCE_PURCHASE', 'RESOURCE_SALE', 'RESOURCE_PACK_PURCHASE']);
+  for (const k of ['TRAINING', 'GENESIS', 'MARKETPLACE_PURCHASE', 'RESOURCE_PURCHASE', 'RESOURCE_PACK_PURCHASE', 'FEEDING', 'GEAR', 'UPGRADE', 'MARKETPLACE_FEE', 'BREEDING']) {
     assert.strictEqual(cfg.TYPES[k].direction, 'debit', k);
   }
   assert.strictEqual(cfg.TYPES.RESOURCE_SALE.direction, 'credit');

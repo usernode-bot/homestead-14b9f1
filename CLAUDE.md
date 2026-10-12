@@ -83,7 +83,8 @@ placeholder screens. PR #2 added Genesis -> Seed -> Awaken (below). PR #3 made
 the Creature a full collectible (below). PR #4 added the Homestead; PR #5 Work
 & Resources (below); PR #6 STEAD Points and Daily Check-in (below); PR #7
 Feeding + Training (below); PR #8 Gear (below); PR #9 Contests (below); then
-Marketplace food (below); then Resource trading between players (below).
+Marketplace food (below); then Resource trading between players (below); then
+Resource packs from the app (below).
 Creature listings, breeding, Gear crafting or trading, other STEAD spending and
 transactions do not exist yet, and none may be faked.
 
@@ -129,8 +130,10 @@ transactions do not exist yet, and none may be faked.
   the date in `GAME_TIMEZONE`, so a wallet checks in once per calendar day,
   always worked out on the server from `req.now`. Rewards, timezone and every
   ledger type (spending types are reserved, inactive) are only in
-  `public/js/stead-config.js`. The two economies stay separate: Work ->
-  Resources, Daily Check-in -> STEAD.
+  `public/js/stead-config.js`. Work -> Resources, Daily Check-in ->
+  STEAD. STEAD can turn into Resources (player listings, and Resource packs
+  from the app under a daily limit), but Work never produces STEAD and nothing
+  turns Resources into STEAD except another player paying for them.
 - **Feeding + Training:** `lib/care.js` owns both, each one transaction under
   a lock on the Creature, then the Homestead, then the STEAD account, with an
   optional per-tap `requestId` (`creature_care_log`, and the TRAINING ledger
@@ -190,6 +193,15 @@ transactions do not exist yet, and none may be faked.
   `LISTING-<id>`. Own listings, too little STEAD, no storage room and sold
   listings are refused with nothing changed; cancelling returns the lot to
   storage. No fee. Limits are only in `public/js/market-config.js`.
+- **Resource packs:** the app also sells every Resource as a fixed pack for
+  STEAD (`market-config.js` PACKS: size, price, perDay, PROVISIONAL, change
+  them only there; every `homestead-config.js` RESOURCES key needs one).
+  `lib/marketplace.js` `buyPack` is one transaction under a lock on the
+  buyer's Homestead: at most perDay packs of a Resource per wallet per game
+  day (`pack_purchases`, `dayKey(req.now)`), `debitStead` (type
+  RESOURCE_PACK_PURCHASE, keyed by the tap's `requestId`), then the pack goes
+  into storage. Packs can't be sold back to the app. The pack price is the
+  ceiling player listings compete under.
 - **Ownership cap:** a wallet owns at most `MAX_OWNED_CREATURES` (10),
   counted on the server from current ownership plus Seeds waiting to be
   awakened. There is no global Creature cap and none may be added. Every

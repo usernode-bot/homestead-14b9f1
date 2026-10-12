@@ -7,7 +7,7 @@
 // its own requestId; a purchase that never got an answer is sent once more
 // with the SAME id, so the server charges for it at most once.
 //
-// Players' Resource listings work the same way: list, buy and cancel are one
+// Resource packs from the app and players' Resource listings work the same way: list, buy and cancel are one
 // request at a time, the server answers with the whole Marketplace again, and
 // a repeat is safe (a listing sells once). The sell form's typing is kept in
 // `form`, never in the store, so typing doesn't re-render.
@@ -28,6 +28,7 @@
     store.update('marketplace', {
       status: 'ready', walletId: data.walletId, owned: data.owned || {}, steadBalance: data.steadBalance,
       listings: data.listings || [], myListings: data.myListings || [], storage: data.storage || null,
+      packsToday: data.packsToday || {},
     });
     // The open Creature's FEED buttons show the same food.
     var v = store.get().viewedCreature;
@@ -141,6 +142,13 @@
     });
   }
 
+  // One Resource pack from the app.
+  function buyPack(resource) {
+    send('buy-pack:' + resource, '/api/marketplace/resource-packs/buy', { resource: resource, requestId: newRequestId() }, function (data) {
+      return data.boughtPack ? { kind: 'bought-pack', pack: data.boughtPack } : null;
+    });
+  }
+
   function buyListing(id) {
     send('buy-listing:' + id, '/api/marketplace/listings/' + Number(id) + '/buy', {}, function (data) {
       return data.boughtListing ? { kind: 'bought-listing', listing: data.boughtListing } : null;
@@ -217,6 +225,6 @@
 
   window.HOMESTEAD_MARKETPLACE = {
     load: load, ensure: ensure, forget: forget, buy: buy, clearMessages: clearMessages,
-    buyListing: buyListing, cancelListing: cancelListing, fillForm: fillForm,
+    buyPack: buyPack, buyListing: buyListing, cancelListing: cancelListing, fillForm: fillForm,
   };
 })();

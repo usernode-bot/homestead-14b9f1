@@ -12,6 +12,7 @@ const mcfg = require('../public/js/market-config');
 const genesis = require('../lib/genesis');
 const homestead = require('../lib/homestead');
 const hcfg = require('../public/js/homestead-config');
+const { fundAndMint } = require('./support');
 
 const T0 = new Date('2026-10-05T10:00:00Z');
 
@@ -122,6 +123,16 @@ test('market config', () => {
   assert.strictEqual(mcfg.MAX_ACTIVE_LISTINGS, 10);
   assert.ok(mcfg.validQuantity(1) && !mcfg.validQuantity(0) && !mcfg.validQuantity(1.5));
   assert.ok(mcfg.validPrice(1) && mcfg.validPrice(mcfg.MAX_PRICE) && !mcfg.validPrice(mcfg.MAX_PRICE + 1) && !mcfg.validPrice(-3));
+});
+
+test('every Resource has a pack', () => {
+  assert.deepStrictEqual(Object.keys(mcfg.PACKS).sort(), hcfg.RESOURCES.map((r) => r.key).sort());
+  for (const [key, p] of Object.entries(mcfg.PACKS)) {
+    for (const n of [p.size, p.price, p.perDay]) assert.ok(Number.isSafeInteger(n) && n >= 1, key);
+  }
+  assert.deepStrictEqual(mcfg.pack('rune'), { size: 1, price: 50, perDay: 2 });
+  assert.strictEqual(mcfg.pack('gold'), null);
+  assert.strictEqual(mcfg.pack('constructor'), null);
 });
 
 test('Resource listings in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) => {
@@ -305,5 +316,132 @@ test('Resource listings in Postgres', { skip: !url && 'DATABASE_URL is not set' 
     await marketplace.cancelListing(pool, 'ut1sam', listed.listingId, T0);
     await assert.rejects(pool.query("UPDATE market_listings SET status = 'active', closed_at = NULL WHERE id = $1", [listed.listingId]), /can never change/);
     await assert.rejects(pool.query("INSERT INTO market_listings (seller, resource, quantity, price) VALUES ('ut1sam', 'gold', 1, 1)"), /market_listings_values/);
+  });
+});
+
+test('Resource packs in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) => {
+  const pool = new Pool({ connectionString: url });
+  t.after(() => pool.end());
+  let funds = 0;
+  const T1 = new Date('2026-10-06T00:30:00Z'); // the next game day (UTC)
+
+  async function reset() {
+    await pool.query(`DROP TABLE IF EXISTS pack_purchases, food_inventory, market_listings, stead_ledger, stead_accounts, contest_creature_locks,
+      contests, contest_challenges, gear_starter_claims, gear_items, creature_care_log, creature_work, homestead_buildings, homesteads,
+      creatures, seeds, genesis_wallets CASCADE`);
+    await genesis.ensureSchema(pool);
+    await homestead.ensureSchema(pool);
+    await stead.ensureSchema(pool);
+    await marketplace.ensureSchema(pool);
+    await marketplace.ensureSchema(pool); // idempotent
+  }
+  async function fund(owner, amount) {
+    await stead.creditStead(pool, owner, amount, 'DAILY_CHECKIN', {}, { key: 'fund-' + (++funds) });
+  }
+  async function home(owner, resources) {
+    await pool.query('INSERT INTO homesteads (owner, storage) VALUES ($1, $2)',
+      [owner, JSON.stringify(Object.assign(hcfg.emptyStorage(), resources))]);
+  }
+  async function storage(owner) {
+    return (await pool.query('SELECT storage FROM homesteads WHERE owner = $1', [owner])).rows[0].storage;
+  }
+  async function packRows(owner) {
+    return (await pool.query('SELECT resource, packs FROM pack_purchases WHERE owner = $1 AND packs > 0', [owner])).rows;
+  }
+  async function ledger(owner) {
+    return (await pool.query("SELECT amount::int, metadata FROM stead_ledger WHERE owner = $1 AND type = 'RESOURCE_PACK_PURCHASE' ORDER BY id", [owner])).rows;
+  }
+
+  await t.test('without a wallet: no packs counted, and buying needs a wallet', async () => {
+    await reset();
+    const s = await marketplace.getState(pool, null, T0);
+    assert.strictEqual(Object.keys(s.packsToday).length, hcfg.RESOURCES.length);
+    assert.ok(Object.values(s.packsToday).every((n) => n === 0));
+    await assert.rejects(marketplace.buyPack(pool, null, 'wood', null, T0), { code: 'no_wallet' });
+  });
+
+  await t.test('buying takes exactly the price and adds exactly one pack to storage', async () => {
+    await reset();
+    await home('ut1alice', { stone: 3 });
+    await fund('ut1alice', 100);
+    const r = await marketplace.buyPack(pool, 'ut1alice', 'stone', 'pack-req-0001', T0);
+    assert.deepStrictEqual([r.boughtPack.resource, r.boughtPack.label, r.boughtPack.size, r.boughtPack.price], ['stone', 'Stone', 10, 30]);
+    assert.strictEqual(r.steadBalance, 70);
+    assert.strictEqual(r.packsToday.stone, 1);
+    assert.strictEqual(r.storage.storage.stone, 13);
+    assert.strictEqual((await storage('ut1alice')).stone, 13);
+    const entries = await ledger('ut1alice');
+    assert.strictEqual(entries.length, 1);
+    assert.strictEqual(entries[0].amount, -30);
+    assert.deepStrictEqual(entries[0].metadata, { resource: 'stone', quantity: 10 });
+  });
+
+  await t.test('a wallet whose Creature never opened its Homestead gets one with the pack in it', async () => {
+    await reset();
+    await fundAndMint(pool, 'ut1nova', 'nova').then((m) => genesis.awaken(pool, 'ut1nova', m.seed.seedId));
+    await fund('ut1nova', 100);
+    assert.strictEqual((await pool.query("SELECT 1 FROM homesteads WHERE owner = 'ut1nova'")).rows.length, 0);
+    await marketplace.buyPack(pool, 'ut1nova', 'rune', null, T0);
+    assert.strictEqual((await storage('ut1nova')).rune, 1);
+  });
+
+  await t.test('no Homestead, an unknown Resource or too little STEAD is refused and changes nothing', async () => {
+    await reset();
+    await fund('ut1ghost', 500);
+    await assert.rejects(marketplace.buyPack(pool, 'ut1ghost', 'wood', null, T0), { code: 'no_homestead' });
+    await home('ut1bob', { wood: 2 });
+    await fund('ut1bob', 99);
+    await assert.rejects(marketplace.buyPack(pool, 'ut1bob', 'gold', null, T0), { code: 'bad_resource' });
+    await assert.rejects(marketplace.buyPack(pool, 'ut1bob', 'crystal', null, T0), { code: 'not_enough_stead' });
+    assert.strictEqual(await stead.getSteadBalance(pool, 'ut1bob'), 99);
+    assert.strictEqual((await storage('ut1bob')).crystal, 0);
+    assert.deepStrictEqual(await packRows('ut1bob'), []);
+    assert.deepStrictEqual(await ledger('ut1bob'), []);
+  });
+
+  await t.test('perDay packs a game day, then refused until the next day', async () => {
+    await reset();
+    await home('ut1alice', {});
+    await fund('ut1alice', 1000);
+    for (let i = 0; i < 2; i++) await marketplace.buyPack(pool, 'ut1alice', 'crystal', null, T0);
+    await assert.rejects(marketplace.buyPack(pool, 'ut1alice', 'crystal', null, T0), { code: 'daily_limit' });
+    assert.strictEqual(await stead.getSteadBalance(pool, 'ut1alice'), 800);
+    // Another Resource has its own count.
+    await marketplace.buyPack(pool, 'ut1alice', 'wood', null, T0);
+    const next = await marketplace.buyPack(pool, 'ut1alice', 'crystal', null, T1);
+    assert.strictEqual(next.packsToday.crystal, 1);
+    assert.strictEqual(next.packsToday.wood, 0);
+    assert.strictEqual((await storage('ut1alice')).crystal, 3);
+  });
+
+  await t.test('the same tap twice charges once', async () => {
+    await reset();
+    await home('ut1alice', {});
+    await fund('ut1alice', 100);
+    await marketplace.buyPack(pool, 'ut1alice', 'grain', 'pack-req-same', T0);
+    const again = await marketplace.buyPack(pool, 'ut1alice', 'grain', 'pack-req-same', T0);
+    assert.strictEqual(again.replayed, true);
+    assert.strictEqual(again.steadBalance, 60);
+    assert.strictEqual((await storage('ut1alice')).grain, 10);
+    assert.strictEqual(again.packsToday.grain, 1);
+  });
+
+  await t.test('many buys at once never pass perDay or overspend', async () => {
+    await reset();
+    await home('ut1alice', {});
+    await fund('ut1alice', 1000);
+    const results = await Promise.allSettled(Array.from({ length: 8 }, () => marketplace.buyPack(pool, 'ut1alice', 'ore', null, T0)));
+    assert.strictEqual(results.filter((r) => r.status === 'fulfilled').length, 5);
+    assert.ok(results.filter((r) => r.status === 'rejected').every((r) => r.reason.code === 'daily_limit'));
+    assert.strictEqual(await stead.getSteadBalance(pool, 'ut1alice'), 1000 - 5 * 35);
+    assert.strictEqual((await storage('ut1alice')).ore, 25);
+
+    await reset();
+    await home('ut1bob', {});
+    await fund('ut1bob', 100); // enough for three Wood packs, not more
+    const poor = await Promise.allSettled(Array.from({ length: 5 }, () => marketplace.buyPack(pool, 'ut1bob', 'wood', null, T0)));
+    assert.strictEqual(poor.filter((r) => r.status === 'fulfilled').length, 3);
+    assert.strictEqual(await stead.getSteadBalance(pool, 'ut1bob'), 10);
+    assert.strictEqual((await storage('ut1bob')).wood, 30);
   });
 });

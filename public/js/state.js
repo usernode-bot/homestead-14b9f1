@@ -111,19 +111,20 @@
         error: null, // what the last request could not do
         viewed: { status: 'idle', id: null, contest: null, walletId: null, clockOffset: 0 }, // status adds 'missing'
       },
-      // Food bought with STEAD, and players' Resource listings
-      // (marketplace.js and lib/marketplace.js).
+      // Food and Resource packs bought with STEAD, and players' Resource
+      // listings (marketplace.js and lib/marketplace.js).
       marketplace: {
         status: 'idle', // 'idle' | 'loading' | 'ready' | 'error'
         walletId: null,
         owned: {}, // { foodId: how many this wallet holds }
         steadBalance: null,
-        pending: null, // 'buy:<foodId>' | 'list' | 'buy-listing:<id>' | 'cancel-listing:<id>' while in flight
-        notice: null, // the last purchase: { foodId, price }, or { kind, listing } for a listing
+        pending: null, // 'buy:<foodId>' | 'buy-pack:<resource>' | 'list' | 'buy-listing:<id>' | 'cancel-listing:<id>' while in flight
+        notice: null, // the last purchase: { foodId, price }, { kind: 'bought-pack', pack }, or { kind, listing } for a listing
         error: null, // what the last request could not do
         listings: [], // other players' Resource listings for sale, newest first
         myListings: [], // this wallet's listings: up for sale, then the latest sold or cancelled
         storage: null, // { storage, used } of this wallet's Homestead, or null
+        packsToday: {}, // { resource: packs this wallet bought from the app today }
       },
       breeding: null,
     };

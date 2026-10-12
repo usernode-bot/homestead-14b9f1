@@ -603,6 +603,7 @@
     var text = '';
     if (n.kind === 'listed') text = 'Listed ' + lot(n.listing) + ' for ' + steadAmount(n.listing.price) + '.';
     else if (n.kind === 'bought-listing') text = 'Bought ' + lot(n.listing) + ' for ' + steadAmount(n.listing.price) + '. It\'s in your storage.';
+    else if (n.kind === 'bought-pack') text = 'Bought ' + fmt(n.pack.size) + ' ' + resourceLabel(n.pack.resource) + ' for ' + steadAmount(n.pack.price) + '. It\'s in your storage.';
     else if (n.kind === 'cancelled') text = 'Listing cancelled. ' + lot(n.listing) + ' went back to your storage.';
     else {
       var bought = foodConfig.food(n.foodId);
@@ -730,6 +731,42 @@
     }).join('') + '</ul>';
   }
 
+  // Resource packs the app sells (market-config.js PACKS), one row per
+  // Resource that has a pack, in homestead-config.js RESOURCES order. Laid
+  // out like the Food rows.
+  function resourcePacks(m, connected, ready) {
+    var storage = m.storage && m.storage.storage;
+    var rows = homesteadConfig.RESOURCES.filter(function (r) { return marketConfig.pack(r.key); }).map(function (r) {
+      var p = marketConfig.pack(r.key);
+      var left = ready ? Math.max(0, p.perDay - (Number(m.packsToday && m.packsToday[r.key]) || 0)) : null;
+      var have = ready ? Number(storage && storage[r.key]) || 0 : null;
+      var each = p.price / p.size;
+      var detail = (Number.isInteger(each) ? fmt(each) : each.toFixed(1)) + ' STEAD each. ' +
+        (left == null ? p.perDay + ' packs a day.' : left + ' of ' + p.perDay + ' packs left today.');
+      var action = '';
+      if (connected) {
+        var pending = m.pending === 'buy-pack:' + r.key;
+        var none = ready && left === 0;
+        var poor = ready && m.steadBalance != null && m.steadBalance < p.price;
+        var text = pending ? 'BUYING…' : none ? 'None left today' : poor ? 'Need ' + steadAmount(p.price) : 'BUY';
+        action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-pack" data-pack="' + r.key + '"' +
+          (!ready || m.pending || none || poor ? ' disabled' : '') + '>' + text + '</button>';
+      }
+      return '<li class="list-row flex-wrap justify-between gap-3" data-pack="' + r.key + '"' + (left == null ? '' : ' data-packs-left="' + left + '"') + '>' +
+        '<span class="min-w-0">' +
+          '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-black">' + fmt(p.size) + ' ' + r.label + '</span>' +
+            '<span class="sticker" data-pack-price="' + p.price + '">' + steadAmount(p.price) + '</span></span>' +
+          '<span class="mt-1 block text-small text-muted">' + detail + '</span>' +
+          (connected ? '<span class="mt-1 block text-small font-bold tabular-nums" data-pack-have="' + (have == null ? '' : have) + '">' +
+            (have == null ? 'You have …' : 'You have ' + fmt(have)) + '</span>' : '') +
+        '</span>' +
+        action +
+      '</li>';
+    }).join('');
+    return '<h2 class="section-label">Resource packs</h2><ul class="list" data-market-packs>' + rows + '</ul>' +
+      '<p class="mt-3 px-1 text-small text-muted">Bought packs go straight into your Homestead storage.</p>';
+  }
+
   function marketplace(state, route) {
     var m = state.marketplace;
     var connected = state.wallet.status === 'connected';
@@ -782,7 +819,8 @@
     }).join('');
     return screenHeading(route) +
       '<div class="max-w-3xl">' + top + messages + trade +
-        '<h2 class="section-label' + (trade ? ' mt-8' : '') + '">Food</h2>' +
+        (trade ? '<div class="mt-8">' : '<div>') + resourcePacks(m, connected, ready) + '</div>' +
+        '<h2 class="section-label mt-8">Food</h2>' +
         '<ul class="list" data-market-foods>' + rows + '</ul>' +
         '<p class="mt-3 px-1 text-small text-muted">Feed food to your Creature on its profile. Creature trading opens in a future update.</p>' +
       '</div>';

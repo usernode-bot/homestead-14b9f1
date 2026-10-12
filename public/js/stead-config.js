@@ -40,6 +40,9 @@
     // buyer pays, the seller is paid, both keyed by the listing, once each.
     RESOURCE_PURCHASE: Object.freeze({ label: 'Resources Bought', direction: 'debit', active: true }),
     RESOURCE_SALE: Object.freeze({ label: 'Resources Sold', direction: 'credit', active: true }),
+    // A Resource pack bought from the app in the Marketplace
+    // (lib/marketplace.js), keyed by the tap's requestId.
+    RESOURCE_PACK_PURCHASE: Object.freeze({ label: 'Resource Packs', direction: 'debit', active: true }),
     FEEDING: Object.freeze({ label: 'Feeding', direction: 'debit', active: false }),
     GEAR: Object.freeze({ label: 'Gear', direction: 'debit', active: false }),
     UPGRADE: Object.freeze({ label: 'Homestead Upgrade', direction: 'debit', active: false }),
