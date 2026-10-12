@@ -728,15 +728,9 @@ async function seedStaging() {
       await work.start(pool, STAGING_DEMO_WALLET, { creatureId: opened.creature.creatureId, durationId: '4h' },
         new Date(Date.now() - 3600 * 1000));
     }
-    // Some Resources in storage and some training on the demo Creature (Lv. 3),
-    // the first time only, so its Stats and training show costs it can pay
-    // and costs it is short of (no Fish, Parts or rare Resources).
-    const home = (await pool.query('SELECT id, storage FROM homesteads WHERE owner = $1', [STAGING_DEMO_WALLET])).rows[0];
-    const hcfg = require('./public/js/homestead-config');
-    if (home && hcfg.storageUsed(home.storage) === 0) {
-      const storage = Object.assign(hcfg.emptyStorage(), { grain: 12, fodder: 3, stone: 20, ore: 9, wood: 4, essence: 7 });
-      await pool.query('UPDATE homesteads SET storage = $2 WHERE id = $1', [home.id, JSON.stringify(storage)]);
-    }
+    // Some training on the demo Creature (Lv. 3), the first time only. Its
+    // storage stays as Work leaves it: the dapp.json checks expect the demo
+    // Homestead to start empty.
     await pool.query(
       `UPDATE creatures SET training_attack = 4, training_hp = 2, training_speed = 2, training_luck = 2, level = 3
        WHERE id = $1 AND training_hp + training_attack + training_defense + training_speed + training_luck = 0`,
