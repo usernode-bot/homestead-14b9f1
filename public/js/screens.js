@@ -407,7 +407,7 @@
       ['Check in every day', 'Daily Check-in pays ' + steadConfig.format(rewards[0]) + ' to ' + steadAmount(rewards[rewards.length - 1]) + ', more for each day in a row.'],
       ['Awaken a Creature', 'Genesis costs ' + steadAmount(GENESIS_COST) + ' and gives you a Seed. Awaken it into a Creature with its own Species, rarity, stats and Trade.'],
       ['Send it to work', 'In MY HOMESTEAD, your Creature works at its Trade\'s building and brings home Resources. Sell spare Resources in the MARKETPLACE.'],
-      ['Make it stronger', 'Feed it to keep it working well, train its stats with STEAD and equip Gear.'],
+      ['Make it stronger', 'Feed it to keep it working well, train its stats with STEAD and Resources, and equip Gear.'],
       ['Compete in BATTLE', 'Challenge another player to a trick-off. Win for ' + steadAmount(contestConfig.WIN_REWARD) + ', or get ' + steadAmount(contestConfig.LOSS_REWARD) + ' for taking part.'],
     ];
     return '<details class="list" id="how-to-play">' +

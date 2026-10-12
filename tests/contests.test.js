@@ -198,7 +198,8 @@ test('Contests in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async 
     assert.deepStrictEqual(await identity(momo.creatureId), before.b);
     assert.strictEqual((await pool.query('SELECT count(*)::int AS n FROM creatures')).rows[0].n, 3);
     assert.strictEqual((await contests.availability(pool, bruno.creatureId, AFTER)).status, 'ready');
-    // Training works again.
+    // Training works again (it spends Resources too).
+    await pool.query(`UPDATE homesteads SET storage = storage || '{"ore": 2, "stone": 2}'::jsonb WHERE owner = $1`, ['ut1alice']);
     await care.train(pool, 'ut1alice', bruno.creatureId, 'attack', null, AFTER);
   });
 

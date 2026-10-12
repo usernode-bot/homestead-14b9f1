@@ -26,7 +26,7 @@
   // Every kind of ledger entry. direction says whether it adds STEAD
   // ('credit') or takes it ('debit'). Only active types can be recorded;
   // the others are reserved for the systems that will spend STEAD. Training
-  // (lib/care.js) is the first one that does.
+  // (lib/care.js) is the first one that does (with Resources beside it).
   var TYPES = Object.freeze({
     DAILY_CHECKIN: Object.freeze({ label: 'Daily Check-in', direction: 'credit', active: true }),
     TRAINING: Object.freeze({ label: 'Training', direction: 'debit', active: true }),

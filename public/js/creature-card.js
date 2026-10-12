@@ -6,8 +6,8 @@
 // - statsList(c) / identityList(c): the base stats and the permanent identity.
 // - feedingSection(c, opts) / trainingSection(c, opts): hunger and condition
 //   with the owner's FEED control; base, training, Gear and effective stats
-//   with the owner's TRAIN controls. Every number comes from the server; the
-//   costs and limits are read from care-config.js. The Gear section itself is
+//   with the owner's TRAIN controls and what each costs. Every number comes
+//   from the server; the costs and limits are read from care-config.js. The Gear section itself is
 //   gear-view.js.
 //
 // The name is the one thing a person types, so it is never written into this
@@ -115,12 +115,33 @@
     return s ? s.label : key;
   }
 
+  function resourceLabel(key) {
+    var r = window.HOMESTEAD_HOMESTEAD_CONFIG.RESOURCES.find(function (x) { return x.key === key; });
+    return r ? r.label : key;
+  }
+
+  // "Farmers" or "Fishers and Smiths": the Trades whose Work brings home
+  // any of these Resources (work-config.js).
+  function producersOf(keys) {
+    var work = window.HOMESTEAD_WORK_CONFIG;
+    var names = cfg.TRADES.filter(function (t) {
+      var w = work.trade(t.id);
+      return w && keys.some(function (k) { return Object.prototype.hasOwnProperty.call(w.perHour, k); });
+    }).map(function (t) { return t.label + 's'; });
+    return names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : (names[0] || 'Creatures');
+  }
+
   // What the last Feed or Train did, as a short status line.
   function noticeText(n) {
     if (!n) return '';
     if (n.kind === 'fed' && n.food) return 'Fed! +' + Number(n.restored) + ' Hunger, -1 ' + (foods.food(n.food) || { name: 'food' }).name;
     if (n.kind === 'fed') return 'Fed! +' + Number(n.restored) + ' Hunger, -' + Number(n.fodderSpent) + ' Fodder';
-    if (n.kind === 'trained') return 'Trained! +' + Number(n.amount) + ' ' + statLabel(n.stat) + ', -' + Number(n.cost) + ' STEAD';
+    if (n.kind === 'trained') {
+      var spent = n.resourcesSpent || {};
+      return 'Trained! +' + Number(n.amount) + ' ' + statLabel(n.stat) + ', -' + Number(n.cost) + ' STEAD' +
+        Object.keys(spent).map(function (k) { return ', -' + Number(spent[k]) + ' ' + resourceLabel(k); }).join('') +
+        (Number(n.levelAfter) > Number(n.levelBefore) ? '. Level up! Lv. ' + Number(n.levelAfter) : '');
+    }
     return '';
   }
 
@@ -200,8 +221,10 @@
     return '<section data-hunger-section><h3 class="section-label">Hunger</h3><ul class="list">' + rows + '</ul></section>';
   }
 
-  // Base, training, Gear and effective stats; for the owner a TRAIN button on
-  // each. data-stat keeps the base value. opts as feedingSection.
+  // Base, training, Gear and effective stats; for the owner, on each stat,
+  // what one session costs at the Creature's Level (STEAD and Resources, with
+  // how many of each they have), what is short, and a TRAIN button.
+  // data-stat keeps the base value. opts as feedingSection.
   function trainingSection(c, opts) {
     opts = opts || {};
     var ctl = opts.canAct ? opts.controls : null;
@@ -210,18 +233,25 @@
     var effective = care.effectiveStats(c);
     var working = !!(ctl && ctl.working);
     var inContest = !!(ctl && ctl.inContest);
-    var poor = !!(ctl && Number(ctl.steadBalance) < care.TRAINING_COST);
+    var noHome = !!(ctl && !ctl.hasHomestead);
+    var level = Number(c.level) || care.START_LEVEL;
+    var steadBalance = ctl ? Number(ctl.steadBalance) || 0 : 0;
+    var storage = (ctl && ctl.storage) || {};
+    var tradeLabel = label(cfg.TRADES, c.trade);
     var busy = !!opts.pending;
+    var steadCost = care.trainingCost(level, care.TRAINABLE_STATS[0], c.trade).stead;
+    var poor = !!(ctl && steadBalance < steadCost);
     var head = '';
     if (opts.canAct) {
       head =
         '<li class="list-row flex-wrap justify-between gap-x-4 gap-y-1">' +
-          '<span class="text-body font-bold" data-training-cost>Cost: ' + care.TRAINING_COST + ' STEAD per +' + care.TRAINING_AMOUNT + '</span>' +
-          '<span class="text-small text-muted">You have <span class="font-bold tabular-nums text-fg" data-training-stead>' + (ctl ? Number(ctl.steadBalance).toLocaleString('en-US') : '…') + '</span> STEAD</span>' +
+          '<span class="text-body font-bold" data-training-cost>Lv. ' + level + ' cost: ' + steadCost + ' STEAD + Resources per +' + care.TRAINING_AMOUNT + '</span>' +
+          '<span class="text-small text-muted">You have <span class="font-bold tabular-nums text-fg" data-training-stead>' + (ctl ? steadBalance.toLocaleString('en-US') : '…') + '</span> STEAD</span>' +
         '</li>' +
         (working ? '<li class="list-row"><p class="text-body font-bold" data-training-blocked="working">Creature is working. Training unavailable.</p></li>'
           : inContest ? '<li class="list-row"><p class="text-body font-bold" data-training-blocked="contest">Creature is in a contest. Training unavailable.</p></li>'
-          : poor ? '<li class="list-row"><p class="text-body text-muted" data-training-blocked="stead">Need ' + care.TRAINING_COST + ' STEAD to train. Daily Check-in on Home pays STEAD.</p></li>' : '') +
+          : noHome ? '<li class="list-row"><p class="text-body text-muted" data-training-blocked="homestead">Open your Homestead first. Training uses Resources from its Storage.</p></li>'
+          : poor ? '<li class="list-row"><p class="text-body text-muted" data-training-blocked="stead">Need ' + steadCost + ' STEAD to train. Daily Check-in on Home pays STEAD.</p></li>' : '') +
         (opts.notice && opts.notice.kind === 'trained' ? '<li class="list-row"><p class="text-body font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p></li>' : '');
     }
     var rows = cfg.STATS.map(function (s) {
@@ -229,13 +259,38 @@
       var b = Number(bonus[s.key]) || 0;
       var gb = Number(gearBonus[s.key]) || 0;
       var atMax = b >= care.MAX_TRAINING_BONUS;
-      var button = '';
+      var extra = '';
       if (opts.canAct) {
+        var cost = care.trainingCost(level, s.key, c.trade);
+        var short = ctl ? care.shortfall(cost, storage, steadBalance) : { stead: 0, resources: [] };
+        var lacking = !noHome && short.resources.length > 0;
+        var discounted = cost.resources.some(function (r) { return r.discounted; });
         var pending = opts.pending === 'train:' + s.key;
-        button = '<button type="button" class="btn-secondary w-full whitespace-nowrap px-3 sm:w-40" data-action="train" data-stat="' + s.key + '"' +
-          ' aria-label="Train ' + s.label + ' for ' + care.TRAINING_COST + ' STEAD"' +
-          (!ctl || atMax || working || inContest || poor || busy ? ' disabled' : '') + '>' +
-          (atMax ? 'MAX TRAINING' : pending ? 'TRAINING…' : '+ TRAIN') + '</button>';
+        var costText = cost.stead + ' STEAD, ' + cost.resources.map(function (r) { return r.amount + ' ' + r.label; }).join(', ');
+        if (!atMax) {
+          extra +=
+            '<p class="flex w-full flex-wrap gap-x-3 gap-y-1 text-small" data-training-cost-of="' + s.key + '">' +
+              '<span class="tabular-nums' + (ctl && short.stead ? ' font-bold text-danger' : '') + '">' + cost.stead + ' STEAD</span>' +
+              cost.resources.map(function (r) {
+                var have = Number(storage[r.key]) || 0;
+                var isShort = !!ctl && !noHome && have < r.amount;
+                return '<span class="tabular-nums' + (isShort ? ' font-bold text-danger' : '') + '" data-training-resource="' + r.key + '" data-need="' + r.amount + '" data-have="' + have + '">' +
+                  r.amount + ' ' + r.label + (ctl ? ' <span' + (isShort ? '' : ' class="text-muted"') + '>(you have ' + have + ')</span>' : '') + '</span>';
+              }).join('') +
+              (discounted ? '<span class="text-muted" data-training-discount>' + tradeLabel + ' discount</span>' : '') +
+            '</p>';
+          if (lacking) {
+            var keys = short.resources.map(function (m) { return m.key; });
+            extra +=
+              '<p class="w-full text-small text-muted" data-training-missing="' + s.key + '">Need ' + care.missingText(short.resources) + '. ' +
+                producersOf(keys) + ' bring ' + (keys.length > 1 ? 'them' : 'it') + ' home from Work, or buy ' + (keys.length > 1 ? 'them' : 'it') + ' in the ' +
+                '<a href="/marketplace" data-nav class="font-bold underline decoration-punk underline-offset-4">MARKETPLACE</a>.</p>';
+          }
+        }
+        extra += '<button type="button" class="btn-secondary w-full whitespace-nowrap px-3 sm:w-40" data-action="train" data-stat="' + s.key + '"' +
+          ' aria-label="Train ' + s.label + ' for ' + costText + '"' +
+          (!ctl || atMax || working || inContest || noHome || poor || lacking || busy ? ' disabled' : '') + '>' +
+          (atMax ? 'MAX TRAINING' : pending ? 'TRAINING…' : lacking ? 'NEED RESOURCES' : '+ TRAIN') + '</button>';
       }
       return '<li class="list-row flex-wrap gap-x-4 gap-y-2" data-training-stat="' + s.key + '">' +
         '<span class="w-20 shrink-0 text-small font-bold">' + s.label.toUpperCase() + '</span>' +
@@ -245,13 +300,14 @@
           '<div><dt class="text-muted">Gear</dt><dd class="tabular-nums' + (gb ? ' font-bold' : ' text-muted') + '" data-gear-bonus="' + s.key + '">+' + gb + '</dd></div>' +
           '<div><dt class="text-muted">Effective</dt><dd class="text-body font-black tabular-nums" data-effective-stat="' + s.key + '">' + effective[s.key] + '</dd></div>' +
         '</dl>' +
-        button +
+        extra +
       '</li>';
     }).join('');
     return '<section data-training><h3 class="section-label">' + (opts.canAct ? 'Stats and training' : 'Stats') + '</h3>' +
       '<ul class="list" data-stats>' + head + rows + '</ul>' +
       '<p class="mt-2 px-1 text-small text-muted">Effective is Base plus Training plus Gear.' +
-        (opts.canAct ? ' Each stat can gain up to +' + care.MAX_TRAINING_BONUS + ' from training. Base stats never change.' : '') + '</p>' +
+        (opts.canAct ? ' Each stat can gain up to +' + care.MAX_TRAINING_BONUS + ' from training. Base stats never change.' +
+          ' Every ' + care.TRAININGS_PER_LEVEL + ' trainings raise the Level by 1. Higher Levels cost more.' : '') + '</p>' +
     '</section>';
   }
 

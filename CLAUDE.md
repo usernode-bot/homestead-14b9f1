@@ -137,7 +137,10 @@ transactions do not exist yet, and none may be faked.
   key) so retries never apply twice. Hunger is stored as of
   `hunger_updated_at` and worked out from the time since; it never harms a
   Creature. Feeding spends Fodder from storage; Training spends STEAD via
-  `debitStead` (type TRAINING), never while Working, never past the max.
+  `debitStead` (type TRAINING) plus Resources from storage, both from
+  `trainingCost` (Level, stat, Trade: every Resource is used by some stat),
+  taken together or not at all, never while Working, never past the max. A
+  Training raises `level` to `levelFor` the bonuses (never down).
   Training bonuses sit beside `base_*`; `effectiveStat` (base + training +
   gear 0 + traits 0) is the one stat calculation. Work stores the hunger
   efficiency at its start and rounds each Resource down. Every value and

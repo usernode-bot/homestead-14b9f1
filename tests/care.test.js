@@ -23,9 +23,57 @@ test('Feeding + Training config', () => {
   assert.strictEqual(cfg.FEED_FODDER_COST, 1);
   assert.strictEqual(cfg.FEED_HUNGER_RESTORE, 25);
   assert.deepStrictEqual(Object.assign({}, cfg.WORK_EFFICIENCY), { WELL_FED: 1, HUNGRY: 0.85, STARVING: 0.6 });
-  assert.strictEqual(cfg.TRAINING_COST, 10);
+  assert.strictEqual(cfg.TRAINING_STEAD_BASE, 10);
   assert.strictEqual(cfg.TRAINING_AMOUNT, 1);
   assert.strictEqual(cfg.MAX_TRAINING_BONUS, 50);
+});
+
+test('training costs STEAD and Resources that rise with the Level', () => {
+  const cost = (lv, stat, trade) => {
+    const c = cfg.trainingCost(lv, stat, trade);
+    return [c.stead, Object.fromEntries(c.resources.map((r) => [r.key, r.amount]))];
+  };
+  assert.deepStrictEqual(cost(1, 'attack', 'farmer'), [10, { ore: 2, stone: 2 }]);
+  assert.deepStrictEqual(cost(3, 'attack', 'farmer'), [20, { ore: 6, stone: 6 }]);
+  // The rare Resource from Lv. 5, one more every 5 Levels.
+  assert.deepStrictEqual(cost(4, 'hp', 'miner'), [25, { grain: 8, fodder: 8 }]);
+  assert.deepStrictEqual(cost(5, 'hp', 'miner'), [30, { grain: 10, fodder: 10, rareFish: 1 }]);
+  assert.deepStrictEqual(cost(10, 'defense', 'fisher'), [55, { wood: 20, stone: 20, hardwood: 2 }]);
+  assert.deepStrictEqual(cost(20, 'luck', 'smith'), [105, { essence: 40, grain: 40, rune: 4 }]);
+  assert.deepStrictEqual(cost(cfg.MAX_LEVEL, 'speed', 'farmer'), [260, { fish: 40, parts: 40, rareFish: 5 }]);
+  // The Creature's own Trade: 25% less, rounded up, at least 1.
+  assert.deepStrictEqual(cost(3, 'attack', 'miner'), [20, { ore: 5, stone: 5 }]);
+  assert.deepStrictEqual(cost(5, 'attack', 'miner'), [30, { ore: 8, stone: 8, crystal: 1 }]);
+  assert.deepStrictEqual(cost(1, 'luck', 'mystic'), [10, { essence: 2, grain: 2 }]);
+  assert.strictEqual(cfg.trainingCost(3, 'attack', 'miner').resources.every((r) => r.discounted), true);
+  assert.strictEqual(cfg.trainingCost(3, 'attack', 'nobody').resources.some((r) => r.discounted), false);
+  assert.strictEqual(cfg.trainingCost(1, 'charm', 'miner'), null);
+  // Level: 1 + every 5 training points; the most is 51.
+  assert.strictEqual(cfg.levelFor({}), 1);
+  assert.strictEqual(cfg.levelFor({ hp: 2, attack: 2 }), 1);
+  assert.strictEqual(cfg.levelFor({ hp: 2, attack: 3 }), 2);
+  assert.strictEqual(cfg.levelFor({ hp: 2, attack: 4, luck: 6 }), 3);
+  assert.strictEqual(cfg.MAX_LEVEL, 51);
+  // What is short, and how it is said.
+  const short = cfg.shortfall(cfg.trainingCost(3, 'speed', 'miner'), { fish: 2 }, 15);
+  assert.strictEqual(short.stead, 5);
+  assert.deepStrictEqual(short.resources, [
+    { key: 'fish', label: 'Fish', need: 6, have: 2 }, { key: 'parts', label: 'Parts', need: 6, have: 0 }]);
+  assert.strictEqual(cfg.missingText(short.resources), '4 more Fish and 6 more Parts');
+});
+
+test('training uses every Resource every Trade brings home, and one session fits in storage', () => {
+  const hcfg = require('../public/js/homestead-config');
+  const wcfg = require('../public/js/work-config');
+  const used = new Set();
+  Object.values(cfg.TRAINING_RECIPES).forEach((r) => { r.main.forEach((k) => used.add(k)); used.add(r.rare); });
+  assert.deepStrictEqual([...used].sort(), hcfg.RESOURCES.map((r) => r.key).sort());
+  Object.values(wcfg.TRADES).forEach((t) => Object.keys(t.perHour).forEach((k) => assert.ok(used.has(k), k)));
+  assert.deepStrictEqual(Object.keys(cfg.TRAINING_RECIPES).sort(), [...cfg.TRAINABLE_STATS].sort());
+  for (const stat of cfg.TRAINABLE_STATS) {
+    const most = cfg.trainingCost(cfg.MAX_LEVEL, stat, null).resources.reduce((sum, r) => sum + r.amount, 0);
+    assert.ok(most <= 100, stat + ' at the top Level takes ' + most);
+  }
 });
 
 test('hunger is worked out from timestamps and never goes below 0', () => {
@@ -102,9 +150,17 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
     if (opts.fodder) {
       await pool.query("UPDATE homesteads SET storage = jsonb_set(storage, '{fodder}', $2::jsonb) WHERE owner = $1", [wallet, String(opts.fodder)]);
     }
+    if (opts.storage) {
+      await pool.query('UPDATE homesteads SET storage = storage || $2::jsonb WHERE owner = $1', [wallet, JSON.stringify(opts.storage)]);
+    }
     if (opts.steadPoints) await stead.creditStead(pool, wallet, opts.steadPoints, 'DAILY_CHECKIN', {}, { key: 'setup' });
     return { id: c.creatureId, base: c.stats, home: opened.homestead };
   }
+  async function storageOf(wallet) {
+    return (await pool.query('SELECT storage FROM homesteads WHERE owner = $1', [wallet])).rows[0].storage;
+  }
+  // Plenty of every Resource for a few Lv. 1 sessions.
+  const PLENTY = Object.fromEntries(require('../public/js/homestead-config').RESOURCES.map((r) => [r.key, 8]));
   async function fodderOf(wallet) {
     return Number((await pool.query('SELECT storage FROM homesteads WHERE owner = $1', [wallet])).rows[0].storage.fodder);
   }
@@ -259,36 +315,102 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
     assert.strictEqual(after.care.holdUntil, null);
   });
 
-  await t.test('training costs 10 STEAD for +1 and leaves base stats alone', async () => {
+  await t.test('training costs STEAD and Resources for +1 and leaves base stats alone', async () => {
     await reset();
-    const { id, base } = await setup('ut1alice', { steadPoints: 25 });
+    const { id, base } = await setup('ut1alice', { steadPoints: 25, trade: 'farmer', storage: { ore: 5, stone: 4, essence: 2, grain: 9 } });
     const r = await care.train(pool, 'ut1alice', id, 'attack', 'train-req-0001', T0);
     assert.strictEqual(r.trained.bonusAfter, 1);
     assert.strictEqual(r.creature.trainingBonus.attack, 1);
     assert.deepStrictEqual(r.creature.stats, base);
     assert.strictEqual(r.creature.effectiveStats.attack, base.attack + 1);
     assert.strictEqual(r.controls.steadBalance, 15);
+    assert.deepStrictEqual(r.trained.resourcesSpent, { ore: 2, stone: 2 });
+    assert.strictEqual(r.controls.storage.ore, 3);
+    assert.strictEqual(r.controls.storage.stone, 2);
+    assert.strictEqual(r.controls.storage.fish, 0);
     const ledger = await stead.getSteadLedger(pool, 'ut1alice');
     assert.strictEqual(ledger[0].type, 'TRAINING');
     assert.strictEqual(ledger[0].amount, -10);
     assert.strictEqual(ledger[0].balanceAfter, 15);
-    // A retry of the same tap: no second charge.
+    // A retry of the same tap: no second charge, in STEAD or Resources.
     const again = await care.train(pool, 'ut1alice', id, 'attack', 'train-req-0001', T0);
     assert.strictEqual(again.replayed, true);
     assert.strictEqual(await stead.getSteadBalance(pool, 'ut1alice'), 15);
-    // 15 -> 5, then below 10 is refused with STEAD unchanged.
+    assert.deepStrictEqual([(await storageOf('ut1alice')).ore, (await storageOf('ut1alice')).stone], [3, 2]);
+    // 15 -> 5, then below 10 is refused with STEAD and storage unchanged.
     await care.train(pool, 'ut1alice', id, 'luck', 'train-req-0002', T0);
-    await assert.rejects(care.train(pool, 'ut1alice', id, 'luck', 'train-req-0003', T0), { code: 'not_enough_stead' });
+    await assert.rejects(care.train(pool, 'ut1alice', id, 'luck', 'train-req-0003', T0),
+      { code: 'not_enough_stead', message: 'Need 10 STEAD to train.' });
     assert.strictEqual(await stead.getSteadBalance(pool, 'ut1alice'), 5);
+    const left = await storageOf('ut1alice');
+    assert.deepStrictEqual([left.essence, left.grain], [0, 7]);
     const row = (await pool.query('SELECT * FROM creatures WHERE id = $1', [id])).rows[0];
     assert.deepStrictEqual([row.training_attack, row.training_luck], [1, 1]);
     // Base stats cannot be written at all.
     await assert.rejects(pool.query('UPDATE creatures SET base_attack = base_attack + 1 WHERE id = $1', [id]), /can never change/);
   });
 
+  await t.test('training with too few Resources, or no Homestead, takes nothing', async () => {
+    await reset();
+    const { id } = await setup('ut1alice', { steadPoints: 100, trade: 'farmer', storage: { fish: 1 } });
+    await assert.rejects(care.train(pool, 'ut1alice', id, 'speed', null, T0), (err) => {
+      assert.strictEqual(err.code, 'not_enough_resources');
+      assert.strictEqual(err.message, 'Need 1 more Fish and 2 more Parts to train Speed.');
+      assert.deepStrictEqual(err.missing, [
+        { key: 'fish', label: 'Fish', need: 2, have: 1 }, { key: 'parts', label: 'Parts', need: 2, have: 0 }]);
+      return true;
+    });
+    assert.strictEqual(await stead.getSteadBalance(pool, 'ut1alice'), 100);
+    assert.strictEqual((await storageOf('ut1alice')).fish, 1);
+    const row = (await pool.query('SELECT training_speed, level FROM creatures WHERE id = $1', [id])).rows[0];
+    assert.deepStrictEqual([row.training_speed, row.level], [0, 1]);
+
+    // An owner with no Homestead has no storage to train from.
+    await pool.query('DELETE FROM homestead_buildings');
+    await pool.query('ALTER TABLE homesteads DISABLE TRIGGER USER');
+    await pool.query('DELETE FROM homesteads');
+    await pool.query('ALTER TABLE homesteads ENABLE TRIGGER USER');
+    await assert.rejects(care.train(pool, 'ut1alice', id, 'hp', null, T0),
+      { code: 'no_homestead', message: 'Open your Homestead first. Training uses Resources from its Storage.' });
+    assert.strictEqual((await care.controls(pool, 'ut1alice', id, T0)).hasHomestead, false);
+    assert.strictEqual(await stead.getSteadBalance(pool, 'ut1alice'), 100);
+  });
+
+  await t.test('every 5 trainings raise the Level, and the next one costs more', async () => {
+    await reset();
+    const { id } = await setup('ut1alice', { steadPoints: 200, trade: 'smith', storage: { ore: 30, stone: 30 } });
+    for (let i = 1; i <= 4; i++) {
+      const r = await care.train(pool, 'ut1alice', id, 'attack', 'lv-req-000' + i, T0);
+      assert.deepStrictEqual([r.trained.levelBefore, r.trained.levelAfter, r.creature.level], [1, 1, 1]);
+    }
+    const fifth = await care.train(pool, 'ut1alice', id, 'attack', 'lv-req-0005', T0);
+    assert.deepStrictEqual([fifth.trained.levelBefore, fifth.trained.levelAfter, fifth.creature.level], [1, 2, 2]);
+    assert.strictEqual(fifth.trained.cost, 10);
+    // 5 x (2 Ore, 2 Stone) at Lv. 1; then Lv. 2 costs 15 STEAD, 4 Ore and 4 Stone.
+    assert.deepStrictEqual([(await storageOf('ut1alice')).ore, (await storageOf('ut1alice')).stone], [20, 20]);
+    const sixth = await care.train(pool, 'ut1alice', id, 'attack', 'lv-req-0006', T0);
+    assert.strictEqual(sixth.trained.cost, 15);
+    assert.deepStrictEqual(sixth.trained.resourcesSpent, { ore: 4, stone: 4 });
+    assert.strictEqual(await stead.getSteadBalance(pool, 'ut1alice'), 200 - 50 - 15);
+    // The Level is kept within its range.
+    await assert.rejects(pool.query('UPDATE creatures SET level = 0 WHERE id = $1', [id]), /creatures_level_range/);
+  });
+
+  await t.test('Creatures trained before Training raised the Level catch up once', async () => {
+    await reset();
+    const { id } = await setup('ut1alice', {});
+    await pool.query('UPDATE creatures SET training_hp = 5, training_attack = 7, level = 1 WHERE id = $1', [id]);
+    await care.ensureSchema(pool);
+    assert.strictEqual((await pool.query('SELECT level FROM creatures WHERE id = $1', [id])).rows[0].level, 3);
+    // A higher Level is never lowered, and a second run changes nothing.
+    await pool.query('UPDATE creatures SET level = 4 WHERE id = $1', [id]);
+    await care.ensureSchema(pool);
+    assert.strictEqual((await pool.query('SELECT level FROM creatures WHERE id = $1', [id])).rows[0].level, 4);
+  });
+
   await t.test('training is refused for a bad stat, another wallet, at the maximum and while working', async () => {
     await reset();
-    const { id } = await setup('ut1alice', { steadPoints: 500, trade: 'miner' });
+    const { id } = await setup('ut1alice', { steadPoints: 500, trade: 'miner', storage: PLENTY });
     await setup('ut1bob', { steadPoints: 500 });
     await assert.rejects(care.train(pool, 'ut1alice', id, 'charm', null, T0), { code: 'bad_stat' });
     await assert.rejects(care.train(pool, 'ut1bob', id, 'hp', null, T0), { code: 'not_yours' });
@@ -308,8 +430,10 @@ test('Feeding + Training in Postgres', { skip: !url && 'DATABASE_URL is not set'
 
   await t.test('rapid training from many tabs never overspends or passes the maximum', async () => {
     await reset();
-    const { id } = await setup('ut1alice', { steadPoints: 55 });
-    await pool.query('UPDATE creatures SET training_defense = $2 WHERE id = $1', [id, cfg.MAX_TRAINING_BONUS - 3]);
+    // Lv. 10 at +47: each session costs 55 STEAD, 20 Wood, 20 Stone and 2 Hardwood.
+    const { id } = await setup('ut1alice', { steadPoints: 190, storage: { wood: 99, stone: 99, hardwood: 99 } });
+    await pool.query('UPDATE creatures SET training_defense = $2, level = $3 WHERE id = $1',
+      [id, cfg.MAX_TRAINING_BONUS - 3, cfg.levelFor({ defense: cfg.MAX_TRAINING_BONUS - 3 })]);
     const results = await Promise.allSettled(Array.from({ length: 10 }, (_, i) =>
       care.train(pool, 'ut1alice', id, 'defense', 'tab-' + String(i).padStart(6, '0'), T0)));
     assert.strictEqual(results.filter((r) => r.status === 'fulfilled').length, 3);
