@@ -4,11 +4,11 @@
 //   for Collection and later the Marketplace, contests and Breeding.
 // - hero(c, opts): the large panel at the top of a Creature's profile.
 // - statsList(c) / identityList(c): the base stats and the permanent identity.
-// - feedingSection(c, opts) / trainingSection(c, opts): hunger and condition
-//   with the owner's FEED control; base, training, Gear and effective stats
-//   with the owner's TRAIN controls and what each costs. Every number comes
-//   from the server; the costs and limits are read from care-config.js. The Gear section itself is
-//   gear-view.js.
+// - feedingSection(c, opts) / feedSection(c, opts) / trainingSection(c, opts):
+//   hunger and condition; the owner's FEED control; base, training, Gear and
+//   effective stats with the owner's TRAIN controls and what each costs.
+//   Every number comes from the server; the costs and limits are read from
+//   care-config.js. The Gear section itself is gear-view.js.
 //
 // The name is the one thing a person types, so it is never written into this
 // HTML: each place it shows is a <span data-creature-name="<id>">, filled in
@@ -34,6 +34,11 @@
 
   function nameSpan(c, cls) {
     return '<span class="' + (cls || '') + '" data-creature-name="' + Number(c.creatureId) + '"></span>';
+  }
+
+  // The heading every profile section opens with.
+  function sectionHead(title) {
+    return '<h3 class="mb-3 px-1 text-heading font-black">' + title + '</h3>';
   }
 
   function rarityBadge(c) {
@@ -153,9 +158,16 @@
     return d.toDateString() === new Date().toDateString() ? time : d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + time;
   }
 
-  // The owner's one FEED panel: the Fodder on hand and FEED FODDER, then the
+  // A Creature's care as feedingSection and feedSection read it, with the
+  // same defaults when its care has not loaded yet.
+  function careOf(c) {
+    return c.care || { hunger: care.HUNGER_MAX, hungerState: 'WELL_FED', hungerLabel: 'WELL FED', condition: 'GOOD' };
+  }
+
+  // The owner's one FEED section: the Fodder on hand and FEED FODDER, then the
   // Marketplace food, then the link to buy more. opts: { controls, pending, notice }
-  function feedPanel(k, opts) {
+  function feedSection(c, opts) {
+    var k = careOf(c);
     var ctl = opts.controls;
     var owned = (ctl && ctl.food) || {};
     var have = foods.FOODS.filter(function (f) { return Number(owned[f.id]) > 0; });
@@ -169,45 +181,48 @@
         (pending ? 'FEEDING…' : f.name.toUpperCase() + ' ×' + Number(owned[f.id])) + '</button>';
     }).join('');
     var n = opts.notice;
-    return '<li class="list-row flex-col items-stretch gap-3" data-feeding>' +
-      '<span class="text-small font-bold">FEED</span>' +
-      '<span class="flex items-baseline justify-between gap-3">' +
-        '<span class="text-muted">Fodder</span>' +
-        '<span class="font-bold tabular-nums" data-fodder="' + (ctl ? fodder : '') + '">' + (ctl ? fodder : '…') + '</span>' +
-      '</span>' +
-      '<p class="text-small text-muted">' + care.FEED_FODDER_COST + ' Fodder gives +' + care.FEED_HUNGER_RESTORE + ' Hunger. Farmers bring Fodder home from Work.</p>' +
-      '<button type="button" class="btn-primary" data-action="feed"' + (!ctl || full || short || busy ? ' disabled' : '') + '>' +
-        (opts.pending === 'feed' ? 'FEEDING…' : 'FEED FODDER') + '</button>' +
-      (ctl && !full && short ? '<p class="text-small font-bold text-muted" data-feed-blocked>Need ' + care.FEED_FODDER_COST + ' Fodder</p>' : '') +
+    return '<section data-feeding>' +
+      sectionHead('Feed') +
+      (n && n.kind === 'fed' ? '<p class="mb-3 px-1 text-body font-bold text-accent" role="status" data-care-notice>' + noticeText(n) + '</p>' : '') +
+      '<ul class="list">' +
+      '<li class="list-row flex-col items-stretch gap-3">' +
+        '<span class="flex items-baseline justify-between gap-3">' +
+          '<span class="text-muted">Fodder</span>' +
+          '<span class="font-bold tabular-nums" data-fodder="' + (ctl ? fodder : '') + '">' + (ctl ? fodder : '…') + '</span>' +
+        '</span>' +
+        '<p class="text-small text-muted">' + care.FEED_FODDER_COST + ' Fodder gives +' + care.FEED_HUNGER_RESTORE + ' Hunger. Farmers bring Fodder home from Work.</p>' +
+        '<button type="button" class="btn-primary" data-action="feed"' + (!ctl || full || short || busy ? ' disabled' : '') + '>' +
+          (opts.pending === 'feed' ? 'FEEDING…' : 'FEED FODDER') + '</button>' +
+        (ctl && !full && short ? '<p class="text-small font-bold text-muted" data-feed-blocked>Need ' + care.FEED_FODDER_COST + ' Fodder</p>' : '') +
+        (ctl && full ? '<p class="text-small font-bold text-muted" data-feed-blocked>Already Full</p>' : '') +
+      '</li>' +
       (ctl ?
-        '<span class="text-muted">Food</span>' +
+        '<li class="list-row flex-wrap justify-between gap-3"><span class="text-muted">Food</span>' +
         (have.length
           ? '<span class="flex flex-wrap gap-2">' + buttons + '</span>'
-          : '<p class="text-small text-muted" data-food-empty>No food yet.</p>')
+          : '<p class="text-small text-muted" data-food-empty>No food yet.</p>') +
+        '</li>'
         : '') +
-      (ctl && full ? '<p class="text-small font-bold text-muted" data-feed-blocked>Already Full</p>' : '') +
-      '<a href="/marketplace" data-nav class="text-small font-bold underline decoration-punk underline-offset-4" data-food-market-link>Buy food in the Marketplace.</a>' +
-      (n && n.kind === 'fed' ? '<p class="text-small font-bold text-accent" role="status" data-care-notice>' + noticeText(n) + '</p>' : '') +
-    '</li>';
+      '</ul>' +
+      '<p class="mt-2 px-1 text-small text-muted"><a href="/marketplace" data-nav class="font-bold underline decoration-punk underline-offset-4" data-food-market-link>Buy food in the Marketplace.</a></p>' +
+    '</section>';
   }
 
-  // Hunger and condition, and for the owner the one FEED panel.
-  // opts: { canAct, controls, pending, notice, error }
+  // Hunger and condition. opts: { canAct, controls, pending, notice, error }
   function feedingSection(c, opts) {
     opts = opts || {};
-    var k = c.care || { hunger: care.HUNGER_MAX, hungerState: 'WELL_FED', hungerLabel: 'WELL FED', condition: 'GOOD' };
+    var k = careOf(c);
     var max = care.HUNGER_MAX;
     var pct = Math.max(0, Math.min(100, (k.hunger / max) * 100));
     var rows =
       '<li class="list-row flex-col items-stretch gap-2">' +
         '<span class="flex items-baseline justify-between gap-3">' +
-          '<span class="text-small font-bold">HUNGER</span>' +
+          '<span class="text-body font-black" data-hunger-state="' + k.hungerState + '">' + k.hungerLabel + '</span>' +
           '<span class="font-bold tabular-nums" data-hunger="' + Number(k.hunger) + '">' + Number(k.hunger) + ' / ' + max + '</span>' +
         '</span>' +
         '<span class="h-2 overflow-hidden rounded-full bg-raised" role="progressbar" aria-label="Hunger" aria-valuemin="0" aria-valuemax="' + max + '" aria-valuenow="' + Number(k.hunger) + '">' +
           '<span class="block h-full rounded-full ' + (k.hungerState === 'WELL_FED' ? 'bg-accent' : k.hungerState === 'HUNGRY' ? 'bg-punk' : 'bg-danger') + '" style="width:' + pct + '%"></span>' +
         '</span>' +
-        '<span class="text-body font-black" data-hunger-state="' + k.hungerState + '">' + k.hungerLabel + '</span>' +
         (k.holdUntil ? '<span class="text-small font-bold text-accent" data-hunger-hold>Stays full until ' + holdTime(k.holdUntil) + '</span>' : '') +
       '</li>' +
       '<li class="list-row justify-between gap-4"><span class="text-muted">Condition</span>' +
@@ -215,10 +230,7 @@
       '<li class="list-row justify-between gap-4"><span class="text-muted">Work output</span>' +
         '<span class="font-bold tabular-nums" data-work-efficiency>' + Math.round(care.efficiency(k.hunger) * 100) + '%</span></li>';
 
-    if (opts.canAct) {
-      rows += feedPanel(k, opts);
-    }
-    return '<section data-hunger-section><h3 class="section-label">Hunger</h3><ul class="list">' + rows + '</ul></section>';
+    return '<section data-hunger-section>' + sectionHead('Hunger') + '<ul class="list">' + rows + '</ul></section>';
   }
 
   // Base, training, Gear and effective stats; for the owner, on each stat,
@@ -251,8 +263,7 @@
         (working ? '<li class="list-row"><p class="text-body font-bold" data-training-blocked="working">Creature is working. Training unavailable.</p></li>'
           : inContest ? '<li class="list-row"><p class="text-body font-bold" data-training-blocked="contest">Creature is in a contest. Training unavailable.</p></li>'
           : noHome ? '<li class="list-row"><p class="text-body text-muted" data-training-blocked="homestead">Open your Homestead first. Training uses Resources from its Storage.</p></li>'
-          : poor ? '<li class="list-row"><p class="text-body text-muted" data-training-blocked="stead">Need ' + steadCost + ' STEAD to train. Daily Check-in on Home pays STEAD.</p></li>' : '') +
-        (opts.notice && opts.notice.kind === 'trained' ? '<li class="list-row"><p class="text-body font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p></li>' : '');
+          : poor ? '<li class="list-row"><p class="text-body text-muted" data-training-blocked="stead">Need ' + steadCost + ' STEAD to train. Daily Check-in on Home pays STEAD.</p></li>' : '');
     }
     var rows = cfg.STATS.map(function (s) {
       var base = Number(c.stats && c.stats[s.key]) || 0;
@@ -267,9 +278,10 @@
         var discounted = cost.resources.some(function (r) { return r.discounted; });
         var pending = opts.pending === 'train:' + s.key;
         var costText = cost.stead + ' STEAD, ' + cost.resources.map(function (r) { return r.amount + ' ' + r.label; }).join(', ');
+        var ownerExtra = '';
         if (!atMax) {
-          extra +=
-            '<p class="flex w-full flex-wrap gap-x-3 gap-y-1 text-small" data-training-cost-of="' + s.key + '">' +
+          ownerExtra +=
+            '<p class="flex flex-1 flex-wrap gap-x-3 gap-y-1 text-small sm:min-w-0" data-training-cost-of="' + s.key + '">' +
               '<span class="tabular-nums' + (ctl && short.stead ? ' font-bold text-danger' : '') + '">' + cost.stead + ' STEAD</span>' +
               cost.resources.map(function (r) {
                 var have = Number(storage[r.key]) || 0;
@@ -281,20 +293,21 @@
             '</p>';
           if (lacking) {
             var keys = short.resources.map(function (m) { return m.key; });
-            extra +=
+            ownerExtra +=
               '<p class="w-full text-small text-muted" data-training-missing="' + s.key + '">Need ' + care.missingText(short.resources) + '. ' +
                 producersOf(keys) + ' bring ' + (keys.length > 1 ? 'them' : 'it') + ' home from Work, or buy ' + (keys.length > 1 ? 'them' : 'it') + ' in the ' +
                 '<a href="/marketplace" data-nav class="font-bold underline decoration-punk underline-offset-4">MARKETPLACE</a>.</p>';
           }
         }
-        extra += '<button type="button" class="btn-secondary w-full whitespace-nowrap px-3 sm:w-40" data-action="train" data-stat="' + s.key + '"' +
+        ownerExtra += '<button type="button" class="btn-secondary w-full whitespace-nowrap px-3 sm:w-40" data-action="train" data-stat="' + s.key + '"' +
           ' aria-label="Train ' + s.label + ' for ' + costText + '"' +
           (!ctl || atMax || working || inContest || noHome || poor || lacking || busy ? ' disabled' : '') + '>' +
           (atMax ? 'MAX TRAINING' : pending ? 'TRAINING…' : lacking ? 'NEED RESOURCES' : '+ TRAIN') + '</button>';
+        extra = '<div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">' + ownerExtra + '</div>';
       }
-      return '<li class="list-row flex-wrap gap-x-4 gap-y-2" data-training-stat="' + s.key + '">' +
-        '<span class="w-20 shrink-0 text-small font-bold">' + s.label.toUpperCase() + '</span>' +
-        '<dl class="grid min-w-60 flex-1 grid-cols-4 gap-2 text-small">' +
+      return '<li class="list-row flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4" data-training-stat="' + s.key + '">' +
+        '<span class="text-body font-bold sm:w-20 sm:shrink-0">' + s.label + '</span>' +
+        '<dl class="grid grid-cols-4 gap-2 text-small sm:min-w-0 sm:flex-1">' +
           '<div><dt class="text-muted">Base</dt><dd class="font-bold tabular-nums" data-stat="' + s.key + '">' + base + '</dd></div>' +
           '<div><dt class="text-muted">Training</dt><dd class="font-bold tabular-nums" data-training-bonus="' + s.key + '">+' + b + '</dd></div>' +
           '<div><dt class="text-muted">Gear</dt><dd class="tabular-nums' + (gb ? ' font-bold' : ' text-muted') + '" data-gear-bonus="' + s.key + '">+' + gb + '</dd></div>' +
@@ -303,7 +316,9 @@
         extra +
       '</li>';
     }).join('');
-    return '<section data-training><h3 class="section-label">' + (opts.canAct ? 'Stats and training' : 'Stats') + '</h3>' +
+    return '<section data-training>' +
+      sectionHead(opts.canAct ? 'Stats and training' : 'Stats') +
+      (opts.notice && opts.notice.kind === 'trained' ? '<p class="mb-3 px-1 text-body font-bold text-accent" role="status" data-care-notice>' + noticeText(opts.notice) + '</p>' : '') +
       '<ul class="list" data-stats>' + head + rows + '</ul>' +
       '<p class="mt-2 px-1 text-small text-muted">Effective is Base plus Training plus Gear.' +
         (opts.canAct ? ' Each stat can gain up to +' + care.MAX_TRAINING_BONUS + ' from training. Base stats never change.' +
@@ -332,30 +347,30 @@
           : '';
       row = '<span class="text-body" data-contest-availability="ready">Ready to compete.</span>' + button;
     }
-    return '<section data-contest-section><h3 class="section-label">Contests</h3><ul class="list">' +
+    return '<section data-contest-section>' + sectionHead('Contests') + '<ul class="list">' +
       '<li class="list-row flex-wrap justify-between gap-3">' + row + '</li></ul></section>';
   }
 
-  // The whole profile: hero; Contests; hunger and identity side by side;
-  // Gear; then stats and training.
+  // The whole profile: hero; Contests; Hunger; Feed (the owner only);
+  // Identity; Gear; then Stats. Every section is one column, evenly spaced,
+  // under the same heading.
   // opts: { canRename, canAct, controls, pending, notice, error, gear, contest, canChallengeOwner }
   function profile(c, opts) {
     opts = opts || {};
-    return '<div class="max-w-3xl" data-creature-profile="' + Number(c.creatureId) + '">' +
+    return '<div class="max-w-3xl space-y-8" data-creature-profile="' + Number(c.creatureId) + '">' +
       hero(c, opts) +
-      (opts.error ? '<p role="alert" class="mt-4 px-1 text-small text-danger" data-field="care-error"></p>' : '') +
-      (opts.contest ? '<div class="mt-8">' + contestSection(c, opts) + '</div>' : '') +
-      '<div class="mt-8 grid gap-6 md:grid-cols-2">' +
-        feedingSection(c, opts) +
-        '<section><h3 class="section-label">Identity</h3>' + identityList(c) + '</section>' +
-      '</div>' +
-      '<div class="mt-8">' + window.HOMESTEAD_GEAR_VIEW.section(c, { canAct: opts.canAct, gear: opts.gear }) + '</div>' +
-      '<div class="mt-8">' + trainingSection(c, opts) + '</div>' +
+      (opts.error ? '<p role="alert" class="px-1 text-small text-danger" data-field="care-error"></p>' : '') +
+      contestSection(c, opts) +
+      feedingSection(c, opts) +
+      (opts.canAct ? feedSection(c, opts) : '') +
+      '<section data-identity-section>' + sectionHead('Identity') + identityList(c) + '</section>' +
+      window.HOMESTEAD_GEAR_VIEW.section(c, { canAct: opts.canAct, gear: opts.gear }) +
+      trainingSection(c, opts) +
     '</div>';
   }
 
   window.HOMESTEAD_CREATURE_CARD = {
     formatId: formatId, card: card, hero: hero, profile: profile,
-    statsList: statsList, identityList: identityList, feedingSection: feedingSection, trainingSection: trainingSection, art: art, rarityBadge: rarityBadge, nameSpan: nameSpan,
+    statsList: statsList, identityList: identityList, feedingSection: feedingSection, feedSection: feedSection, trainingSection: trainingSection, art: art, rarityBadge: rarityBadge, nameSpan: nameSpan,
   };
 })();
