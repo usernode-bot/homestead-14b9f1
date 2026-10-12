@@ -174,7 +174,9 @@
     });
     var select = root.querySelector('#market-resource');
     if (select) {
-      if (form.resource) select.value = form.resource;
+      // A Resource this storage has none of left is listed but can't be chosen.
+      var kept = form.resource && select.querySelector('option[value="' + form.resource + '"]:not([disabled])');
+      if (kept) select.value = form.resource;
       if (!select.value && select.options.length) select.selectedIndex = 0;
       form.resource = select.value;
     }

@@ -147,6 +147,12 @@
       "expectText": "Sold by @staging-demo-rival"
     },
     {
+      "name": "Marketplace has a row for every Homestead Resource, listed or not",
+      "path": "/marketplace",
+      "expectSelector": "[data-market-listings] [data-market-resource=\"grain\"] ~ [data-market-resource=\"rune\"][data-listing-count=\"0\"]",
+      "expectText": "None for sale"
+    },
+    {
       "name": "Collection placeholder",
       "path": "/collection",
       "expectSelector": "[data-empty=\"collection\"]",

@@ -611,6 +611,27 @@
     return text ? '<p class="mb-4 text-body font-bold text-accent" role="status" data-market-notice>' + text + '</p>' : '';
   }
 
+  // One player's listing inside its Resource's row.
+  function listingForSale(l, m, connected, ready) {
+    var id = Number(l.listingId);
+    var action = '';
+    if (connected) {
+      var pending = m.pending === 'buy-listing:' + id;
+      var poor = ready && m.steadBalance != null && m.steadBalance < l.price;
+      var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : 'BUY';
+      action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-listing" data-listing-id="' + id + '"' +
+        (!ready || m.pending || poor ? ' disabled' : '') + '>' + text + '</button>';
+    }
+    return '<span class="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3" data-listing="' + id + '" data-listing-resource="' + l.resource + '">' +
+      '<span class="min-w-0">' +
+        '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-bold tabular-nums">' + lot(l) + '</span>' +
+          '<span class="sticker" data-listing-price="' + Number(l.price) + '">' + steadAmount(l.price) + '</span></span>' +
+        '<span class="mt-1 block text-small text-muted">Sold by <span data-listing-seller="' + id + '"></span></span>' +
+      '</span>' +
+      action +
+    '</span>';
+  }
+
   function listingsForSale(state, m, connected, ready) {
     var body;
     if (m.status === 'error' && !connected) {
@@ -620,29 +641,27 @@
       '</section>';
     } else if (m.status !== 'ready') {
       body = '<ul class="list" aria-busy="true"><li class="list-row"><span class="skeleton inline-block h-5 w-40"><span class="sr-only">Loading listings</span></span></li></ul>';
-    } else if (!m.listings.length) {
-      body = '<ul class="list" data-market-listings><li class="list-row text-body text-muted" data-empty="listings">No Resources for sale right now.' +
-        (connected ? ' List yours below.' : '') + '</li></ul>';
     } else {
-      body = '<ul class="list" data-market-listings>' + m.listings.map(function (l) {
-        var id = Number(l.listingId);
-        var action = '';
-        if (connected) {
-          var pending = m.pending === 'buy-listing:' + id;
-          var poor = ready && m.steadBalance != null && m.steadBalance < l.price;
-          var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : 'BUY';
-          action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-listing" data-listing-id="' + id + '"' +
-            (!ready || m.pending || poor ? ' disabled' : '') + '>' + text + '</button>';
-        }
-        return '<li class="list-row flex-wrap justify-between gap-3" data-listing="' + id + '" data-listing-resource="' + l.resource + '">' +
-          '<span class="min-w-0">' +
-            '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-black tabular-nums">' + lot(l) + '</span>' +
-              '<span class="sticker" data-listing-price="' + Number(l.price) + '">' + steadAmount(l.price) + '</span></span>' +
-            '<span class="mt-1 block text-small text-muted">Sold by <span data-listing-seller="' + id + '"></span></span>' +
+      // Every Resource a Homestead can hold (homestead-config.js RESOURCES)
+      // gets a row, listed or not, so new Resources show up here on their
+      // own. Each row holds that Resource's listings.
+      body = '<ul class="list" data-market-listings>' + homesteadConfig.RESOURCES.map(function (r) {
+        var forSale = m.listings.filter(function (l) { return l.resource === r.key; });
+        var count = forSale.length
+          ? fmt(forSale.length) + (forSale.length === 1 ? ' listing' : ' listings')
+          : 'None for sale';
+        return '<li class="list-row flex-col items-stretch" data-market-resource="' + r.key + '" data-listing-count="' + forSale.length + '">' +
+          '<span class="flex flex-wrap items-center justify-between gap-3">' +
+            '<span class="text-body font-black">' + r.label + '</span>' +
+            '<span class="text-small text-muted">' + count + '</span>' +
           '</span>' +
-          action +
+          forSale.map(function (l) { return listingForSale(l, m, connected, ready); }).join('') +
         '</li>';
       }).join('') + '</ul>';
+      if (!m.listings.length) {
+        body = '<p class="mb-3 px-1 text-small text-muted" data-empty="listings">No Resources for sale right now.' +
+          (connected ? ' List yours below.' : '') + '</p>' + body;
+      }
     }
     return '<h2 class="section-label">Resources for sale</h2>' + body;
   }
@@ -660,8 +679,12 @@
       var active = m.myListings.filter(function (l) { return l.status === 'active'; }).length;
       var atMax = active >= marketConfig.MAX_ACTIVE_LISTINGS;
       var busy = m.pending === 'list';
-      var options = have.map(function (r) {
-        return '<option value="' + r.key + '">' + r.label + ' (' + fmt(storage[r.key]) + ')</option>';
+      // Every Resource is in the list; the ones this storage has none of
+      // can't be chosen.
+      var options = homesteadConfig.RESOURCES.map(function (r) {
+        var n = Number(storage[r.key]) || 0;
+        return '<option value="' + r.key + '"' + (n > 0 ? (r === have[0] ? ' selected' : '') : ' disabled') + '>' +
+          r.label + ' (' + fmt(n) + ')</option>';
       }).join('');
       body = '<form id="market-sell-form" class="grid gap-4 rounded-xl border border-line bg-surface p-4 sm:grid-cols-3" novalidate data-market-sell>' +
         '<div><label for="market-resource" class="block text-small text-muted">Resource</label>' +
