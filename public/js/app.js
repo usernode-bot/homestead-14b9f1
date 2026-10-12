@@ -58,11 +58,14 @@
     var waiting = store.get().wallet.status === 'connected' && c.status === 'ready' ? c.incoming.length : 0;
     navEl.innerHTML = screens.NAV.map(function (r) {
       var current = r.key === 'mine' ? inMyHomestead(route) : r === route || (r === route.nav && route.contestId);
-      return '<li><a href="' + r.path + '" data-nav class="nav-tab"' + (r.key === 'mine' ? ' data-nav-mine' : '') +
+      return '<li class="min-w-0 flex-auto sm:flex-none"><a href="' + r.path + '" data-nav class="nav-tab nav-tab-main"' + (r.key === 'mine' ? ' data-nav-mine' : '') +
+        (r.short !== r.label ? ' aria-label="' + r.label + '"' : '') +
         (current ? ' aria-current="page"' : '') + '>' +
-        screens.icon(r.icon || r.key, 'h-4 w-4') + r.label +
+        screens.icon(r.icon || r.key, 'h-5 w-5 shrink-0 sm:h-4 sm:w-4') +
+        '<span class="max-w-full truncate sm:hidden">' + r.short + '</span>' +
+        '<span class="hidden sm:inline">' + r.label + '</span>' +
         (r.key === 'contests' && waiting
-          ? '<span class="rounded-full bg-punk px-1.5 text-small font-black tabular-nums text-ground" data-contest-badge="' + waiting + '">' + waiting + '<span class="sr-only"> ' + (waiting === 1 ? 'challenge' : 'challenges') + ' waiting</span></span>'
+          ? '<span class="absolute right-1 top-1 rounded-full bg-punk px-1.5 text-small font-black tabular-nums text-ground sm:static" data-contest-badge="' + waiting + '">' + waiting + '<span class="sr-only"> ' + (waiting === 1 ? 'challenge' : 'challenges') + ' waiting</span></span>'
           : '') +
         '</a></li>';
     }).join('');

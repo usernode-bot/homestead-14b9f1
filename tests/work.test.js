@@ -172,33 +172,38 @@ test('Work in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) 
     await assert.rejects(pool.query('DELETE FROM creature_work WHERE id = $1', [w.workId]));
   });
 
-  await t.test('a full storage keeps the rest pending instead of losing it', async () => {
+  await t.test('collect moves the whole reward in, whatever storage already holds', async () => {
     await reset();
     const { creature, home } = await homeWith('ut1alice', 'miner');
     await pool.query('UPDATE homesteads SET storage = $2 WHERE id = $1',
       [home.homesteadId, JSON.stringify(Object.assign(hcfg.emptyStorage(), { stone: 92 }))]);
     const { work: w } = await work.start(pool, 'ut1alice', { creatureId: creature.creatureId, durationId: '1h' }, T0);
     const r = await work.collect(pool, 'ut1alice', w.workId, at(1), (lo, hi) => hi); // stone 24, ore 10, crystal 1
-    assert.deepStrictEqual(r.moved, { stone: 8 });
-    assert.deepStrictEqual(r.work.pending, { stone: 16, ore: 10, crystal: 1 });
+    assert.deepStrictEqual(r.moved, { stone: 24, ore: 10, crystal: 1 });
+    assert.deepStrictEqual(r.work.pending, {});
     let o = await work.overview(pool, home.homesteadId, at(1), { settle: true });
     assert.deepStrictEqual(o.active, [], 'the Creature is free to work again');
-    assert.strictEqual(o.pendingTotal, 27);
+    assert.strictEqual(o.pendingTotal, 0);
     let h = (await homestead.open(pool, 'ut1alice')).homestead;
-    assert.strictEqual(h.storageUsed, 100);
-    // Still full: collecting pending moves nothing and loses nothing.
-    assert.deepStrictEqual((await work.collectPending(pool, 'ut1alice', at(2))).moved, {});
-    // Space frees up (a future system spends resources): the rest arrives.
-    await pool.query('UPDATE homesteads SET storage = $2 WHERE id = $1',
-      [home.homesteadId, JSON.stringify(Object.assign(hcfg.emptyStorage(), { stone: 50 }))]);
+    assert.strictEqual(h.storageUsed, 127);
+    // Old pending left over from when storage had a limit: a claimed Work set
+    // directly with collected below rewards gets all of it moved, once across
+    // concurrent calls.
+    const left = await pool.query(
+      `INSERT INTO creature_work (homestead_id, creature_id, owner, trade, building_id, duration_id, duration_seconds, started_at,
+         status, rewards, collected, completed_at, claimed_at)
+       VALUES ($1, $2, 'ut1alice', 'miner', $3, '1h', 3600, $4, 'claimed', $5, '{"stone": 8}', $4, $4) RETURNING id`,
+      [home.homesteadId, creature.creatureId, wcfg.buildingFor('miner'), at(2), JSON.stringify({ stone: 24, ore: 10, crystal: 1 })]
+    );
     const all = await Promise.all([1, 2, 3].map(() => work.collectPending(pool, 'ut1alice', at(3))));
     const movedTotal = {};
     for (const r of all) for (const [k, n] of Object.entries(r.moved)) movedTotal[k] = (movedTotal[k] || 0) + n;
     assert.deepStrictEqual(movedTotal, { stone: 16, ore: 10, crystal: 1 }, 'concurrent collects move it once between them');
     h = (await homestead.open(pool, 'ut1alice')).homestead;
-    assert.deepStrictEqual([h.storage.stone, h.storage.ore, h.storage.crystal], [66, 10, 1], 'each pending amount arrived once');
+    assert.deepStrictEqual([h.storage.stone, h.storage.ore, h.storage.crystal], [132, 20, 2], 'each pending amount arrived once');
     o = await work.overview(pool, home.homesteadId, at(3), { settle: true });
     assert.strictEqual(o.pendingTotal, 0);
+    assert.strictEqual((await pool.query('SELECT collected FROM creature_work WHERE id = $1', [left.rows[0].id])).rows[0].collected.stone, 24);
   });
 
   await t.test('history shows the latest entries, newest first', async () => {

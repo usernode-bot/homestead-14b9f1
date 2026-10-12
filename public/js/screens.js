@@ -36,21 +36,22 @@
   // of a tab (header: true). The 'mine' group are the tabs of MY HOMESTEAD, in
   // tab order; title is the browser title when it differs from the label.
   var ROUTES = [
-    { path: '/', key: 'home', label: 'HOME' },
+    { path: '/', key: 'home', label: 'HOME', short: 'HOME' },
     { path: '/creature', key: 'creature', label: 'CREATURE', title: 'MY CREATURE', group: 'mine' },
     { path: '/homestead', key: 'homestead', label: 'HOMESTEAD', group: 'mine' },
     { path: '/collection', key: 'collection', label: 'COLLECTION', group: 'mine' },
-    { path: '/contests', key: 'contests', label: 'BATTLE' },
-    { path: '/marketplace', key: 'marketplace', label: 'MARKETPLACE' },
+    { path: '/contests', key: 'contests', label: 'BATTLE', short: 'BATTLE' },
+    { path: '/marketplace', key: 'marketplace', label: 'MARKETPLACE', short: 'MARKET' },
     { path: '/profile', key: 'profile', label: 'PROFILE', header: true },
   ];
   function routeByKey(key) { return ROUTES.find(function (r) { return r.key === key; }); }
   var MINE_TABS = ROUTES.filter(function (r) { return r.group === 'mine'; });
 
-  // The top menu, in order. MY HOMESTEAD opens its first tab.
+  // The top menu, in order. MY HOMESTEAD opens its first tab. short is a
+  // tab's label on phones, where all four tabs share one row.
   var NAV = [
     routeByKey('home'),
-    { path: MINE_TABS[0].path, key: 'mine', label: 'MY HOMESTEAD', icon: 'homestead' },
+    { path: MINE_TABS[0].path, key: 'mine', label: 'MY HOMESTEAD', short: 'HOMESTEAD', icon: 'homestead' },
     routeByKey('contests'),
     routeByKey('marketplace'),
   ];
@@ -623,17 +624,15 @@
       body = '<ul class="list" data-market-listings><li class="list-row text-body text-muted" data-empty="listings">No Resources for sale right now.' +
         (connected ? ' List yours below.' : '') + '</li></ul>';
     } else {
-      var free = ready && m.storage ? m.storage.capacity - m.storage.used : null;
       body = '<ul class="list" data-market-listings>' + m.listings.map(function (l) {
         var id = Number(l.listingId);
         var action = '';
         if (connected) {
           var pending = m.pending === 'buy-listing:' + id;
           var poor = ready && m.steadBalance != null && m.steadBalance < l.price;
-          var noRoom = free != null && free < l.quantity;
-          var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : noRoom ? 'No room in storage' : 'BUY';
+          var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : 'BUY';
           action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-listing" data-listing-id="' + id + '"' +
-            (!ready || m.pending || poor || noRoom ? ' disabled' : '') + '>' + text + '</button>';
+            (!ready || m.pending || poor ? ' disabled' : '') + '>' + text + '</button>';
         }
         return '<li class="list-row flex-wrap justify-between gap-3" data-listing="' + id + '" data-listing-resource="' + l.resource + '">' +
           '<span class="min-w-0">' +

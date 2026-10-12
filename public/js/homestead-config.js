@@ -7,13 +7,13 @@
 //
 // Nothing here produces anything yet. Work, production, upgrades and
 // building unlocks arrive in later updates and will read and raise the
-// stored values (level, capacity, storage_capacity, building level/unlocked).
+// stored values (level, capacity, building level/unlocked). Storage has no
+// limit: it holds whatever Work brings home.
 (function (root) {
   // Every Homestead starts here.
   var START = Object.freeze({
     level: 1,
     capacity: 1, // how many Creatures can live in it
-    storageCapacity: 100, // the most resources storage can ever hold in total
   });
 
   // The building slots every Homestead has, in display order. Each starts at
@@ -31,7 +31,7 @@
   var LOCKED_NOTE = 'Requires future Homestead progression.';
 
   // What storage can hold. Every Homestead starts with all of them at zero;
-  // their total can never pass the Homestead's storage capacity.
+  // there is no limit on how much it holds in total.
   var RESOURCES = Object.freeze([
     { key: 'grain', label: 'Grain' },
     { key: 'fodder', label: 'Fodder' },
