@@ -172,6 +172,11 @@
       "expectText": "HOMESTEAD"
     },
     {
+      "name": "The menu has a short phone label for each tab",
+      "path": "/",
+      "expectSelector": "#nav a[data-nav-mine][aria-label=\"MY HOMESTEAD\"] span.truncate"
+    },
+    {
       "name": "The menu shows MY HOMESTEAD as current on /creature",
       "path": "/creature",
       "expectSelector": "#nav [data-nav-mine][aria-current=\"page\"]",

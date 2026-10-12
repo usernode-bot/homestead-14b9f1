@@ -36,21 +36,22 @@
   // of a tab (header: true). The 'mine' group are the tabs of MY HOMESTEAD, in
   // tab order; title is the browser title when it differs from the label.
   var ROUTES = [
-    { path: '/', key: 'home', label: 'HOME' },
+    { path: '/', key: 'home', label: 'HOME', short: 'HOME' },
     { path: '/creature', key: 'creature', label: 'CREATURE', title: 'MY CREATURE', group: 'mine' },
     { path: '/homestead', key: 'homestead', label: 'HOMESTEAD', group: 'mine' },
     { path: '/collection', key: 'collection', label: 'COLLECTION', group: 'mine' },
-    { path: '/contests', key: 'contests', label: 'BATTLE' },
-    { path: '/marketplace', key: 'marketplace', label: 'MARKETPLACE' },
+    { path: '/contests', key: 'contests', label: 'BATTLE', short: 'BATTLE' },
+    { path: '/marketplace', key: 'marketplace', label: 'MARKETPLACE', short: 'MARKET' },
     { path: '/profile', key: 'profile', label: 'PROFILE', header: true },
   ];
   function routeByKey(key) { return ROUTES.find(function (r) { return r.key === key; }); }
   var MINE_TABS = ROUTES.filter(function (r) { return r.group === 'mine'; });
 
-  // The top menu, in order. MY HOMESTEAD opens its first tab.
+  // The top menu, in order. MY HOMESTEAD opens its first tab. short is a
+  // tab's label on phones, where all four tabs share one row.
   var NAV = [
     routeByKey('home'),
-    { path: MINE_TABS[0].path, key: 'mine', label: 'MY HOMESTEAD', icon: 'homestead' },
+    { path: MINE_TABS[0].path, key: 'mine', label: 'MY HOMESTEAD', short: 'HOMESTEAD', icon: 'homestead' },
     routeByKey('contests'),
     routeByKey('marketplace'),
   ];

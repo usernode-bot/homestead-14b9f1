@@ -160,6 +160,12 @@
     @apply inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-small font-bold tracking-wide text-muted
       hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus;
   }
+  /* The main menu's tabs on phones: they fill one row, icon above a short
+     label, so the whole menu fits one screen width. From sm up, a pill tab. */
+  .nav-tab-main {
+    @apply relative w-full flex-col justify-center gap-0.5 rounded-2xl px-0.5 py-1.5 tracking-tight
+      sm:w-auto sm:flex-row sm:gap-2 sm:rounded-full sm:px-3.5 sm:py-0 sm:tracking-wide;
+  }
   .nav-tab[aria-current='page'] {
     @apply bg-fg text-ground hover:bg-fg hover:text-ground;
   }
