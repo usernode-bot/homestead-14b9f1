@@ -250,6 +250,7 @@
       else if (name === 'feed-food') creatures.feed(action.dataset.food);
       else if (name === 'buy-food') market.buy(action.dataset.food);
       else if (name === 'marketplace-retry') market.load();
+      else if (name === 'buy-pack') market.buyPack(action.dataset.pack);
       else if (name === 'buy-listing') market.buyListing(Number(action.dataset.listingId));
       else if (name === 'cancel-listing') market.cancelListing(Number(action.dataset.listingId));
       else if (name === 'train') creatures.train(action.dataset.stat);

@@ -10,6 +10,7 @@
   var foodConfig = window.HOMESTEAD_FOOD_CONFIG;
   var marketConfig = window.HOMESTEAD_MARKET_CONFIG;
   var homesteadConfig = window.HOMESTEAD_HOMESTEAD_CONFIG;
+  var workConfig = window.HOMESTEAD_WORK_CONFIG;
   var gearView = window.HOMESTEAD_GEAR_VIEW;
   var contestView = window.HOMESTEAD_CONTEST_VIEW;
 
@@ -603,6 +604,7 @@
     var text = '';
     if (n.kind === 'listed') text = 'Listed ' + lot(n.listing) + ' for ' + steadAmount(n.listing.price) + '.';
     else if (n.kind === 'bought-listing') text = 'Bought ' + lot(n.listing) + ' for ' + steadAmount(n.listing.price) + '. It\'s in your storage.';
+    else if (n.kind === 'bought-pack') text = 'Bought ' + fmt(n.pack.size) + ' ' + resourceLabel(n.pack.resource) + ' for ' + steadAmount(n.pack.price) + '. It\'s in your storage.';
     else if (n.kind === 'cancelled') text = 'Listing cancelled. ' + lot(n.listing) + ' went back to your storage.';
     else {
       var bought = foodConfig.food(n.foodId);
@@ -611,40 +613,104 @@
     return text ? '<p class="mb-4 text-body font-bold text-accent" role="status" data-market-notice>' + text + '</p>' : '';
   }
 
+  // The Marketplace's Resource categories: one per Homestead building
+  // (homestead-config.js BUILDINGS order), holding the Resources the Trade
+  // that works there brings home (work-config.js TRADES), then "Other" for a
+  // Resource no Trade produces. Derived, so a new Resource or building shows
+  // up in the right place on its own. `keep` filters the Resources.
+  function resourceCategories(keep) {
+    var cats = homesteadConfig.BUILDINGS.map(function (b) { return { id: b.id, label: b.name, resources: [] }; });
+    var other = { id: 'other', label: 'Other', resources: [] };
+    homesteadConfig.RESOURCES.forEach(function (r) {
+      if (keep && !keep(r)) return;
+      var tradeId = Object.keys(workConfig.TRADES).find(function (t) {
+        return Object.prototype.hasOwnProperty.call(workConfig.TRADES[t].perHour, r.key);
+      });
+      var building = tradeId ? workConfig.TRADES[tradeId].building : null;
+      var cat = cats.find(function (c) { return c.id === building; }) || other;
+      cat.resources.push(r);
+    });
+    return cats.concat(other).filter(function (c) { return c.resources.length; });
+  }
+
+  // A Marketplace section's heading. Sections are spaced the same way
+  // throughout; the first one sits right under the balance.
+  function marketSection(title, first) {
+    return '<h2 class="text-heading font-black' + (first ? '' : ' mt-10') + '">' + title + '</h2>';
+  }
+  // One category's block: its name, then its rows in one list.
+  function categoryBlock(cat, rows) {
+    return '<section class="mt-4" data-market-category="' + cat.id + '">' +
+      '<h3 class="section-label">' + cat.label + '</h3>' +
+      '<ul class="list">' + rows + '</ul>' +
+    '</section>';
+  }
+  // A row's name with its price sticker beside it.
+  function rowTitle(name, sticker) {
+    return '<span class="flex flex-wrap items-center gap-x-3 gap-y-1"><span class="text-body font-black tabular-nums">' + name + '</span>' + sticker + '</span>';
+  }
+  // Every action button in a row has the same width, so the buttons line up
+  // in one column down each list.
+  var ROW_BUTTON = 'w-28 shrink-0 sm:w-36';
+  // A row: what it is on the left (taking the room left over), its action on
+  // the right.
+  function marketRow(attrs, left, action) {
+    return '<li class="list-row justify-between"' + attrs + '><span class="min-w-0 flex-1">' + left + '</span>' + (action || '') + '</li>';
+  }
+
+  // One player's listing inside its Resource's row.
+  function listingForSale(l, m, connected, ready) {
+    var id = Number(l.listingId);
+    var action = '';
+    if (connected) {
+      var pending = m.pending === 'buy-listing:' + id;
+      var poor = ready && m.steadBalance != null && m.steadBalance < l.price;
+      var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : 'BUY';
+      action = '<button type="button" class="btn-primary ' + ROW_BUTTON + '" data-action="buy-listing" data-listing-id="' + id + '"' +
+        (!ready || m.pending || poor ? ' disabled' : '') + '>' + text + '</button>';
+    }
+    return '<span class="flex items-center justify-between gap-3 border-t border-line pt-3" data-listing="' + id + '" data-listing-resource="' + l.resource + '">' +
+      '<span class="min-w-0 flex-1">' +
+        rowTitle(lot(l), '<span class="sticker" data-listing-price="' + Number(l.price) + '">' + steadAmount(l.price) + '</span>') +
+        '<span class="mt-1 block text-small text-muted">Sold by <span data-listing-seller="' + id + '"></span></span>' +
+      '</span>' +
+      action +
+    '</span>';
+  }
+
   function listingsForSale(state, m, connected, ready) {
     var body;
     if (m.status === 'error' && !connected) {
-      body = '<section class="collectible state-error">' +
+      body = '<section class="collectible state-error mt-3">' +
         '<p class="text-heading">Couldn\'t load what\'s for sale.</p>' +
         '<button type="button" class="btn-secondary mt-2" data-action="marketplace-retry">Retry</button>' +
       '</section>';
     } else if (m.status !== 'ready') {
-      body = '<ul class="list" aria-busy="true"><li class="list-row"><span class="skeleton inline-block h-5 w-40"><span class="sr-only">Loading listings</span></span></li></ul>';
-    } else if (!m.listings.length) {
-      body = '<ul class="list" data-market-listings><li class="list-row text-body text-muted" data-empty="listings">No Resources for sale right now.' +
-        (connected ? ' List yours below.' : '') + '</li></ul>';
+      body = '<ul class="list mt-3" aria-busy="true"><li class="list-row"><span class="skeleton inline-block h-5 w-40"><span class="sr-only">Loading listings</span></span></li></ul>';
     } else {
-      body = '<ul class="list" data-market-listings>' + m.listings.map(function (l) {
-        var id = Number(l.listingId);
-        var action = '';
-        if (connected) {
-          var pending = m.pending === 'buy-listing:' + id;
-          var poor = ready && m.steadBalance != null && m.steadBalance < l.price;
-          var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : 'BUY';
-          action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-listing" data-listing-id="' + id + '"' +
-            (!ready || m.pending || poor ? ' disabled' : '') + '>' + text + '</button>';
-        }
-        return '<li class="list-row flex-wrap justify-between gap-3" data-listing="' + id + '" data-listing-resource="' + l.resource + '">' +
-          '<span class="min-w-0">' +
-            '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-black tabular-nums">' + lot(l) + '</span>' +
-              '<span class="sticker" data-listing-price="' + Number(l.price) + '">' + steadAmount(l.price) + '</span></span>' +
-            '<span class="mt-1 block text-small text-muted">Sold by <span data-listing-seller="' + id + '"></span></span>' +
-          '</span>' +
-          action +
-        '</li>';
-      }).join('') + '</ul>';
+      // Every Resource a Homestead can hold gets a row in its category,
+      // listed or not. Each row holds that Resource's listings.
+      body = '<div data-market-listings>' + resourceCategories().map(function (cat) {
+        return categoryBlock(cat, cat.resources.map(function (r) {
+          var forSale = m.listings.filter(function (l) { return l.resource === r.key; });
+          var count = forSale.length
+            ? fmt(forSale.length) + (forSale.length === 1 ? ' listing' : ' listings')
+            : 'None for sale';
+          return '<li class="list-row flex-col items-stretch" data-market-resource="' + r.key + '" data-listing-count="' + forSale.length + '">' +
+            '<span class="flex items-center justify-between gap-3">' +
+              '<span class="text-body font-black">' + r.label + '</span>' +
+              '<span class="text-small ' + (forSale.length ? 'font-bold' : 'text-muted') + '">' + count + '</span>' +
+            '</span>' +
+            forSale.map(function (l) { return listingForSale(l, m, connected, ready); }).join('') +
+          '</li>';
+        }).join(''));
+      }).join('') + '</div>';
+      if (!m.listings.length) {
+        body = '<p class="mt-1 px-1 text-small text-muted" data-empty="listings">No Resources for sale right now.' +
+          (connected ? ' List yours below.' : '') + '</p>' + body;
+      }
     }
-    return '<h2 class="section-label">Resources for sale</h2>' + body;
+    return marketSection('Resources for sale', true) + body;
   }
 
   function sellPanel(m) {
@@ -652,7 +718,7 @@
     var have = storage ? homesteadConfig.RESOURCES.filter(function (r) { return Number(storage[r.key]) > 0; }) : [];
     var body;
     if (!have.length) {
-      body = '<ul class="list"><li class="list-row flex-wrap justify-between gap-3" data-empty="sell">' +
+      body = '<ul class="list mt-3"><li class="list-row flex-wrap justify-between gap-3" data-empty="sell">' +
         '<span class="text-body text-muted">Nothing to sell yet. Send a Creature to work to bring home Resources.</span>' +
         '<a href="/homestead" data-nav class="btn-secondary shrink-0">Go to Homestead</a>' +
       '</li></ul>';
@@ -660,10 +726,16 @@
       var active = m.myListings.filter(function (l) { return l.status === 'active'; }).length;
       var atMax = active >= marketConfig.MAX_ACTIVE_LISTINGS;
       var busy = m.pending === 'list';
-      var options = have.map(function (r) {
-        return '<option value="' + r.key + '">' + r.label + ' (' + fmt(storage[r.key]) + ')</option>';
+      // Every Resource is in the list, grouped by category; the ones this
+      // storage has none of can't be chosen.
+      var options = resourceCategories().map(function (cat) {
+        return '<optgroup label="' + cat.label + '">' + cat.resources.map(function (r) {
+          var n = Number(storage[r.key]) || 0;
+          return '<option value="' + r.key + '"' + (n > 0 ? (r === have[0] ? ' selected' : '') : ' disabled') + '>' +
+            r.label + ' (' + fmt(n) + ')</option>';
+        }).join('') + '</optgroup>';
       }).join('');
-      body = '<form id="market-sell-form" class="grid gap-4 rounded-xl border border-line bg-surface p-4 sm:grid-cols-3" novalidate data-market-sell>' +
+      body = '<form id="market-sell-form" class="mt-3 grid gap-4 rounded-xl border border-line bg-surface p-4 sm:grid-cols-3" novalidate data-market-sell>' +
         '<div><label for="market-resource" class="block text-small text-muted">Resource</label>' +
           '<select id="market-resource" class="field mt-1" data-market-input="resource">' + options + '</select></div>' +
         '<div><label for="market-quantity" class="block text-small text-muted">How many</label>' +
@@ -677,34 +749,65 @@
             : 'The Resources leave your storage while they are listed. Cancel the listing to get them back.') + '</p></div>' +
       '</form>';
     }
-    return '<h2 class="section-label mt-8">Sell Resources</h2>' + body;
+    return marketSection('Sell Resources') + body;
   }
 
   function myListings(m) {
     if (!m.myListings.length) return '';
-    return '<h2 class="section-label mt-8">Your listings</h2><ul class="list" data-my-listings>' + m.myListings.map(function (l) {
+    return marketSection('Your listings') + '<ul class="list mt-3" data-my-listings>' + m.myListings.map(function (l) {
       var id = Number(l.listingId);
       var detail;
       var action = '';
       if (l.status === 'active') {
         var pending = m.pending === 'cancel-listing:' + id;
         detail = 'For sale';
-        action = '<button type="button" class="btn-secondary shrink-0" data-action="cancel-listing" data-listing-id="' + id + '"' +
+        action = '<button type="button" class="btn-secondary ' + ROW_BUTTON + '" data-action="cancel-listing" data-listing-id="' + id + '"' +
           (m.pending ? ' disabled' : '') + '>' + (pending ? 'CANCELLING…' : 'CANCEL') + '</button>';
       } else if (l.status === 'sold') {
         detail = 'Sold to <span data-listing-buyer="' + id + '"></span>. You got ' + steadAmount(l.price) + '.';
       } else {
         detail = 'Cancelled. Back in your storage.';
       }
-      return '<li class="list-row flex-wrap justify-between gap-3" data-my-listing="' + id + '" data-listing-status="' + l.status + '">' +
-        '<span class="min-w-0">' +
-          '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-black tabular-nums">' + lot(l) + '</span>' +
-            '<span class="sticker">' + steadAmount(l.price) + '</span></span>' +
-          '<span class="mt-1 block text-small text-muted">' + detail + '</span>' +
-        '</span>' +
-        action +
-      '</li>';
+      return marketRow(' data-my-listing="' + id + '" data-listing-status="' + l.status + '"',
+        rowTitle(lot(l), '<span class="sticker">' + steadAmount(l.price) + '</span>') +
+        '<span class="mt-1 block text-small text-muted">' + detail + '</span>',
+        action);
     }).join('') + '</ul>';
+  }
+
+  // Resource packs the app sells (market-config.js PACKS), one row per
+  // Resource that has a pack, grouped by category. Laid out like the Food
+  // rows.
+  function resourcePacks(m, connected, ready) {
+    var storage = m.storage && m.storage.storage;
+    var blocks = resourceCategories(function (r) { return marketConfig.pack(r.key); }).map(function (cat) {
+      return categoryBlock(cat, cat.resources.map(function (r) {
+        var p = marketConfig.pack(r.key);
+        var left = ready ? Math.max(0, p.perDay - (Number(m.packsToday && m.packsToday[r.key]) || 0)) : null;
+        var have = ready ? Number(storage && storage[r.key]) || 0 : null;
+        var each = p.price / p.size;
+        var detail = (Number.isInteger(each) ? fmt(each) : each.toFixed(1)) + ' STEAD each. ' +
+          (left == null ? p.perDay + ' packs a day.' : left + ' of ' + p.perDay + ' packs left today.');
+        var action = '';
+        if (connected) {
+          var pending = m.pending === 'buy-pack:' + r.key;
+          var none = ready && left === 0;
+          var poor = ready && m.steadBalance != null && m.steadBalance < p.price;
+          var text = pending ? 'BUYING…' : none ? 'None left today' : poor ? 'Need ' + steadAmount(p.price) : 'BUY';
+          action = '<button type="button" class="btn-primary ' + ROW_BUTTON + '" data-action="buy-pack" data-pack="' + r.key + '"' +
+            (!ready || m.pending || none || poor ? ' disabled' : '') + '>' + text + '</button>';
+        }
+        return marketRow(' data-pack="' + r.key + '"' + (left == null ? '' : ' data-packs-left="' + left + '"'),
+          rowTitle(fmt(p.size) + ' ' + r.label, '<span class="sticker" data-pack-price="' + p.price + '">' + steadAmount(p.price) + '</span>') +
+          '<span class="mt-1 block text-small text-muted">' + detail + '</span>' +
+          (connected ? '<span class="mt-1 block text-small font-bold tabular-nums" data-pack-have="' + (have == null ? '' : have) + '">' +
+            (have == null ? 'You have …' : 'You have ' + fmt(have)) + '</span>' : ''),
+          action);
+      }).join(''));
+    }).join('');
+    return marketSection('Resource packs') +
+      '<p class="mt-1 px-1 text-small text-muted">Bought packs go straight into your Homestead storage.</p>' +
+      '<div data-market-packs>' + blocks + '</div>';
   }
 
   function marketplace(state, route) {
@@ -743,24 +846,21 @@
         var full = ready && owned >= foodConfig.MAX_OWNED_PER_FOOD;
         var poor = ready && m.steadBalance != null && m.steadBalance < f.price;
         var text = pending ? 'BUYING…' : full ? 'You have the most you can hold' : poor ? 'Need ' + steadAmount(f.price) : 'BUY';
-        action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-food" data-food="' + f.id + '"' +
+        action = '<button type="button" class="btn-primary ' + ROW_BUTTON + '" data-action="buy-food" data-food="' + f.id + '"' +
           (!ready || m.pending || full || poor ? ' disabled' : '') + '>' + text + '</button>';
       }
-      return '<li class="list-row flex-wrap justify-between gap-3" data-food="' + f.id + '">' +
-        '<span class="min-w-0">' +
-          '<span class="flex flex-wrap items-center gap-3"><span class="text-body font-black">' + f.name + '</span>' +
-            '<span class="sticker" data-food-price="' + f.price + '">' + steadAmount(f.price) + '</span></span>' +
-          '<span class="mt-1 block text-small text-muted">' + f.description + '</span>' +
-          (connected ? '<span class="mt-1 block text-small font-bold tabular-nums" data-food-owned="' + (owned == null ? '' : owned) + '">' +
-            (owned == null ? 'You have …' : 'You have ' + owned) + '</span>' : '') +
-        '</span>' +
-        action +
-      '</li>';
+      return marketRow(' data-food="' + f.id + '"',
+        rowTitle(f.name, '<span class="sticker" data-food-price="' + f.price + '">' + steadAmount(f.price) + '</span>') +
+        '<span class="mt-1 block text-small text-muted">' + f.description + '</span>' +
+        (connected ? '<span class="mt-1 block text-small font-bold tabular-nums" data-food-owned="' + (owned == null ? '' : owned) + '">' +
+          (owned == null ? 'You have …' : 'You have ' + owned) + '</span>' : ''),
+        action);
     }).join('');
     return screenHeading(route) +
       '<div class="max-w-3xl">' + top + messages + trade +
-        '<h2 class="section-label' + (trade ? ' mt-8' : '') + '">Food</h2>' +
-        '<ul class="list" data-market-foods>' + rows + '</ul>' +
+        resourcePacks(m, connected, ready) +
+        marketSection('Food') +
+        '<ul class="list mt-3" data-market-foods>' + rows + '</ul>' +
         '<p class="mt-3 px-1 text-small text-muted">Feed food to your Creature on its profile. Creature trading opens in a future update.</p>' +
       '</div>';
   }
