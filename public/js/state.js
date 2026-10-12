@@ -123,7 +123,7 @@
         error: null, // what the last request could not do
         listings: [], // other players' Resource listings for sale, newest first
         myListings: [], // this wallet's listings: up for sale, then the latest sold or cancelled
-        storage: null, // { storage, used, capacity } of this wallet's Homestead, or null
+        storage: null, // { storage, used } of this wallet's Homestead, or null
       },
       breeding: null,
     };

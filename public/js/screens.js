@@ -623,17 +623,15 @@
       body = '<ul class="list" data-market-listings><li class="list-row text-body text-muted" data-empty="listings">No Resources for sale right now.' +
         (connected ? ' List yours below.' : '') + '</li></ul>';
     } else {
-      var free = ready && m.storage ? m.storage.capacity - m.storage.used : null;
       body = '<ul class="list" data-market-listings>' + m.listings.map(function (l) {
         var id = Number(l.listingId);
         var action = '';
         if (connected) {
           var pending = m.pending === 'buy-listing:' + id;
           var poor = ready && m.steadBalance != null && m.steadBalance < l.price;
-          var noRoom = free != null && free < l.quantity;
-          var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : noRoom ? 'No room in storage' : 'BUY';
+          var text = pending ? 'BUYING…' : poor ? 'Need ' + steadAmount(l.price) : 'BUY';
           action = '<button type="button" class="btn-primary shrink-0 sm:min-w-28" data-action="buy-listing" data-listing-id="' + id + '"' +
-            (!ready || m.pending || poor || noRoom ? ' disabled' : '') + '>' + text + '</button>';
+            (!ready || m.pending || poor ? ' disabled' : '') + '>' + text + '</button>';
         }
         return '<li class="list-row flex-wrap justify-between gap-3" data-listing="' + id + '" data-listing-resource="' + l.resource + '">' +
           '<span class="min-w-0">' +
