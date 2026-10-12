@@ -12,7 +12,7 @@ const creatures = require('../lib/creatures');
 const homestead = require('../lib/homestead');
 
 test('Homestead config', () => {
-  assert.deepStrictEqual(hcfg.START, { level: 1, capacity: 1, storageCapacity: 100 });
+  assert.deepStrictEqual(hcfg.START, { level: 1, capacity: 1 });
   assert.strictEqual(hcfg.BUILDINGS.map((b) => b.name).join(','), 'Barn,Mine,Lumber Camp,Fishing Hut,Workshop,Mystic Shrine');
   for (const b of hcfg.BUILDINGS) assert.ok(b.description.length > 10, b.id);
   assert.deepStrictEqual(hcfg.BUILDING_START, { level: 0, unlocked: false });
@@ -61,7 +61,7 @@ test('Homesteads in Postgres', { skip: !url && 'DATABASE_URL is not set' }, asyn
     assert.strictEqual(h.level, 1);
     assert.strictEqual(h.capacity, 1);
     assert.strictEqual(h.creatureId, c.creatureId);
-    assert.strictEqual(h.storageCapacity, 100);
+    assert.strictEqual(h.storageCapacity, undefined);
     assert.strictEqual(h.storageUsed, 0);
     assert.deepStrictEqual(h.storage, hcfg.emptyStorage());
     // Only the building of the Creature's Trade is unlocked (PR #5 Work).
@@ -133,19 +133,18 @@ test('Homesteads in Postgres', { skip: !url && 'DATABASE_URL is not set' }, asyn
     assert.deepStrictEqual(viewed, { homestead: opened.homestead, creature: c });
   });
 
-  await t.test('storage can never pass its capacity or go negative', async () => {
+  await t.test('storage can never go negative', async () => {
     await reset();
     await awakenFor('ut1alice');
     const { homestead: h } = await homestead.open(pool, 'ut1alice');
     const set = (storage) => pool.query('UPDATE homesteads SET storage = $2 WHERE id = $1', [h.homesteadId, JSON.stringify(storage)]);
-    await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: 101 })));
-    await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: 60, stone: 41 })));
     await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: -1 })));
     await assert.rejects(set(Object.assign(hcfg.emptyStorage(), { wood: 'lots' })));
-    await assert.rejects(pool.query('UPDATE homesteads SET storage_capacity = -1 WHERE id = $1', [h.homesteadId]));
-    await set(Object.assign(hcfg.emptyStorage(), { wood: 60, stone: 40 }));
+    // Storage has no limit: past the old capacity it still takes it.
+    await set(Object.assign(hcfg.emptyStorage(), { wood: 101 }));
+    await set(Object.assign(hcfg.emptyStorage(), { wood: 600, stone: 400 }));
     const again = await homestead.open(pool, 'ut1alice');
-    assert.strictEqual(again.homestead.storageUsed, 100);
+    assert.strictEqual(again.homestead.storageUsed, 1000);
   });
 
   await t.test('a Homestead\'s id, owner and creation time are permanent', async () => {
