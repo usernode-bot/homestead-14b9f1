@@ -126,6 +126,17 @@
   }
   var FULL_TEXT = 'You own ' + fmt(MAX_OWNED) + ' Creatures, the most one wallet can hold. Genesis is unavailable.';
 
+  // How long saving up will take, from the average Daily Check-in payout
+  // over the cycle. Plain words: days under two weeks, weeks otherwise.
+  function genesisTimeEstimate(remaining) {
+    var rewards = steadConfig.CHECKIN_REWARDS;
+    var total = 0;
+    for (var i = 0; i < rewards.length; i++) total += Number(rewards[i]);
+    var days = Math.max(1, Math.ceil(remaining / (total / rewards.length)));
+    if (days < 14) return 'about ' + days + (days === 1 ? ' day' : ' days');
+    return 'about ' + Math.round(days / 7) + ' weeks';
+  }
+
   // Genesis on Home: loading, the Seed waiting to be awakened, or GENESIS
   // (with its confirmation step). Every rule is checked again on the server.
   function genesisPanel(state) {
@@ -185,7 +196,23 @@
     } else if (full) {
       reason = '<p class="mt-3 text-small font-bold" data-genesis-blocked="full">Collection Full.</p>';
     } else if (poor) {
-      reason = '<p class="mt-3 text-small text-muted" data-genesis-blocked="stead">Need ' + steadAmount(GENESIS_COST) + ' for Genesis. Daily Check-in on Home pays STEAD.</p>';
+      var remaining = GENESIS_COST - st.steadBalance;
+      var pct = Math.min(100, (st.steadBalance / GENESIS_COST) * 100);
+      var rewards = steadConfig.CHECKIN_REWARDS;
+      var contestConfig = window.HOMESTEAD_CONTEST_CONFIG;
+      reason =
+        '<div data-genesis-blocked="stead">' +
+          // Same bar as the CREATURES count: share of the cost already saved.
+          '<div class="mt-4 h-2 overflow-hidden rounded-full bg-raised" role="progressbar" aria-label="STEAD toward Genesis" aria-valuemin="0" aria-valuemax="' + Number(GENESIS_COST) + '" aria-valuenow="' + Number(Math.min(st.steadBalance, GENESIS_COST)) + '">' +
+            '<div class="h-full rounded-full bg-accent" style="width:' + pct + '%"></div>' +
+          '</div>' +
+          '<p class="mt-2 text-small text-muted"><span class="font-bold text-fg">' + steadAmount(remaining) + '</span> to go: ' + genesisTimeEstimate(remaining) + ' of Daily Check-ins.</p>' +
+          '<p class="mt-4 text-small font-bold">Ways to earn STEAD</p>' +
+          '<ul data-genesis-earn-ways>' +
+            '<li class="mt-2 flex items-start gap-2">' + icon('home', 'mt-0.5 h-5 w-5 shrink-0 text-punk') + '<p class="text-small"><span class="font-bold">Daily Check-in</span> on Home: ' + steadConfig.format(rewards[0]) + ' to ' + steadAmount(rewards[rewards.length - 1]) + ' a day, more for each day in a row.</p></li>' +
+            '<li class="mt-2 flex items-start gap-2">' + icon('contests', 'mt-0.5 h-5 w-5 shrink-0 text-punk') + '<p class="text-small"><span class="font-bold">Contests</span> in BATTLE: ' + steadAmount(contestConfig.WIN_REWARD) + ' for a win, ' + steadAmount(contestConfig.LOSS_REWARD) + ' for taking part.</p></li>' +
+          '</ul>' +
+        '</div>';
     }
     var awakened = '';
     if (connected && g.notice === 'creature-awakened') {
