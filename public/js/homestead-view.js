@@ -195,7 +195,7 @@
       : '<span class="inline-flex items-center gap-1 rounded-md bg-raised px-2 py-0.5 text-small font-black tracking-wide text-muted" data-building-status="locked">' + icon('lock', 'h-3.5 w-3.5') + 'LOCKED</span>';
     var def = hcfg.building(b.buildingId);
     return '<li class="card flex flex-col gap-2" data-building="' + (def ? def.id : '') + '" data-unlocked="' + (b.unlocked ? 'true' : 'false') + '">' +
-      '<div class="flex items-start justify-between gap-2">' +
+      '<div class="flex flex-wrap items-start justify-between gap-2">' +
         '<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-raised text-punk">' + icon(def ? def.id : '') + '</span>' +
         status +
       '</div>' +
