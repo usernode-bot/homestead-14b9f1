@@ -156,8 +156,41 @@
     if (e.target && e.target.id === 'how-to-play') howToPlayOpen = e.target.open;
   }, true);
 
+  // The last screen a player looked at, remembered on this device so the app
+  // reopens there (only when opened at its front door, /).
+  var PLACE_KEY = 'homestead:last-path';
+  var savedPath = null;
+
+  // Only a path this app knows may be saved or restored: a corrupted or old
+  // value (or anything like //other.host) never reaches history.
+  function knownPath(path) {
+    if (typeof path !== 'string') return false;
+    if (path === '/gear') return true;
+    if (screens.ROUTES.some(function (r) { return r.path === path; })) return true;
+    return CREATURE_PATH.test(path) || HOMESTEAD_PATH.test(path) || CONTEST_PATH.test(path);
+  }
+
+  // Writes only when the path changes, so store-driven re-renders don't hit
+  // storage. The query is never stored, so no token is kept.
+  function savePlace(path) {
+    if (path === savedPath) return;
+    savedPath = path;
+    try { localStorage.setItem(PLACE_KEY, path); } catch (_) {}
+  }
+
+  // Runs once, before the first render. At the front door only, replaces the
+  // address with the saved screen (so Back doesn't first step to HOME).
+  function restorePlace() {
+    if ((window.location.pathname.replace(/\/+$/, '') || '/') !== '/') return;
+    var saved = null;
+    try { saved = localStorage.getItem(PLACE_KEY); } catch (_) {}
+    if (!knownPath(saved) || saved === '/') return;
+    history.replaceState(null, '', saved + window.location.search + window.location.hash);
+  }
+
   function render() {
     var route = currentRoute();
+    savePlace(route.path);
     // Starts the load (which re-renders) only when this Creature isn't showing.
     if (route.creatureId) creatures.view(route.creatureId);
     // My Creature loads the same way, for its Feed and Train controls (once:
@@ -287,6 +320,7 @@
   store.subscribe(render);
   window.HOMESTEAD_APP = { navigate: navigate };
 
+  restorePlace();
   render();
   genesis.load();
   wallet.restore();
