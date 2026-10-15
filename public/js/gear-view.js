@@ -80,21 +80,21 @@
       '<button type="button" class="btn-secondary" data-action="gear-choose-cancel">CANCEL</button>' +
     '</span>';
     if (g.status === 'error') {
-      return '<div class="flex flex-col gap-3 border-t border-line pt-3" data-gear-picker="' + slot + '">' + head +
+      return '<div class="flex w-full flex-col gap-3 border-t border-line pt-3" data-gear-picker="' + slot + '">' + head +
         '<p class="text-small text-muted">Couldn\'t load your Gear inventory.</p>' +
         '<button type="button" class="btn-secondary self-start" data-action="gear-retry">Retry</button></div>';
     }
     if (g.status !== 'ready') {
-      return '<div class="flex flex-col gap-3 border-t border-line pt-3" data-gear-picker="' + slot + '" aria-busy="true">' + head +
+      return '<div class="flex w-full flex-col gap-3 border-t border-line pt-3" data-gear-picker="' + slot + '" aria-busy="true">' + head +
         '<span class="sr-only">Loading your Gear</span><div class="skeleton h-12 w-full"></div></div>';
     }
     var list = candidates(g, slot);
     if (!list.length) {
-      return '<div class="flex flex-col gap-3 border-t border-line pt-3" data-gear-picker="' + slot + '">' + head +
+      return '<div class="flex w-full flex-col gap-3 border-t border-line pt-3" data-gear-picker="' + slot + '">' + head +
         '<p class="text-small text-muted" data-gear-picker-empty>No ' + slotLabel(slot) + ' in your Gear inventory.</p>' +
         '<a href="/gear" data-nav class="btn-secondary self-start">Open Gear inventory</a></div>';
     }
-    return '<div class="flex flex-col gap-3 border-t border-line pt-3" data-gear-picker="' + slot + '">' + head +
+    return '<div class="flex w-full flex-col gap-3 border-t border-line pt-3" data-gear-picker="' + slot + '">' + head +
       (current ? '<p class="text-small text-muted">Equipping one returns ' + esc(current.name) + ' to your inventory.</p>' : '') +
       '<ul class="divide-y divide-line">' + list.map(function (item) {
         var pending = g.pending === 'equip:' + item.gearId;
@@ -129,14 +129,14 @@
             : '<button type="button" class="btn-secondary" data-action="gear-choose" data-creature-id="' + Number(c.creatureId) + '" data-slot="' + s.id + '"' + (busy ? ' disabled' : '') + '>EQUIP GEAR</button>') +
         '</span>';
       }
-      return '<li class="list-row flex-col items-stretch gap-3" data-gear-slot="' + s.id + '">' +
-        '<span class="text-small font-bold">' + s.label.toUpperCase() + '</span>' +
-        body + actions +
+      return '<li class="list-row flex-wrap justify-between gap-3" data-gear-slot="' + s.id + '">' +
+        '<span class="min-w-0"><span class="block text-small text-muted">' + s.label + '</span>' + body + '</span>' +
+        actions +
         (choosing ? picker(c, s.id, item, g) : '') +
       '</li>';
     }).join('');
     return '<section data-gear-section>' +
-      '<h3 class="section-label">Gear</h3>' +
+      '<h3 class="mb-3 px-1 text-heading font-black">Gear</h3>' +
       (g ? notice(g, 'mb-3 px-1') + errorLine(g, 'mb-3 px-1') : '') +
       '<ul class="list">' + rows + '</ul>' +
       (g ? '<p class="mt-2 px-1 text-small text-muted">Equipping is free and Gear stays on while your Creature works. <a href="/gear" data-nav class="font-bold text-fg underline decoration-punk underline-offset-4">Open Gear inventory</a></p>' : '') +

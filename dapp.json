@@ -231,7 +231,13 @@
       "name": "A Creature's profile shows its hunger and condition",
       "path": "/creature/1",
       "expectSelector": "[data-creature-profile] [data-hunger-section] [data-condition]",
-      "expectText": "HUNGER"
+      "expectText": "Condition"
+    },
+    {
+      "name": "A Creature's profile stacks its sections in one column, Hunger before Identity",
+      "path": "/creature/1",
+      "expectSelector": "[data-creature-profile] [data-hunger-section] ~ [data-identity-section]",
+      "expectText": "Identity"
     },
     {
       "name": "A Creature's profile shows base, training and effective stats",
@@ -243,7 +249,7 @@
       "name": "A Creature's profile shows its Gear slots",
       "path": "/creature/1",
       "expectSelector": "[data-creature-profile] [data-gear-section] [data-gear-slot=\"tool\"] ~ [data-gear-slot=\"accessory\"]",
-      "expectText": "ACCESSORY"
+      "expectText": "Accessory"
     },
     {
       "name": "A Creature's profile shows the Gear layer of every stat",
