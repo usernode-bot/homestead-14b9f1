@@ -53,6 +53,12 @@
       "expectText": "DAILY CHECK-IN"
     },
     {
+      "name": "Home ends with About the game",
+      "path": "/",
+      "expectSelector": "#view > section:last-child",
+      "expectText": "Genesis is live."
+    },
+    {
       "name": "My Creature placeholder",
       "path": "/creature",
       "expectSelector": "[data-empty=\"creature\"]",
