@@ -24,7 +24,7 @@
         walletId: null,
         genesisUsed: false,
         history: [], // the Geneses this wallet used, newest first
-        confirming: false, // the "Spend 5,000 STEAD?" step is showing
+        confirming: false, // the "Spend 500 STEAD?" step is showing
         pending: null, // 'mint' | 'awaken' while a request is in flight
         notice: null, // 'seed-created' | 'creature-awakened' after one succeeds
         awakenedId: null, // the Creature the last Awaken made
