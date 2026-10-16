@@ -3,7 +3,7 @@
 **Awaken a Monster. Give it a Home. Make it Yours.**
 
 A collectible game about cute, strange punk monsters, built on Homeroom.
-Each wallet can own up to 10 Creatures; Genesis costs 5,000 STEAD.
+Each wallet can own up to 10 Creatures; Genesis costs 500 STEAD.
 
 This is the foundation (PR #1): navigation, a Homeroom wallet connection,
 the Home screen with a Creature counter and placeholder screens
