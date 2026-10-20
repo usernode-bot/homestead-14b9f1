@@ -118,13 +118,16 @@
         walletId: null,
         owned: {}, // { foodId: how many this wallet holds }
         steadBalance: null,
-        pending: null, // 'buy:<foodId>' | 'buy-pack:<resource>' | 'list' | 'buy-listing:<id>' | 'cancel-listing:<id>' while in flight
+        pending: null, // 'buy:<foodId>' | 'buy-pack:<resource>' | 'list' | 'buy-listing:<id>' | 'cancel-listing:<id>' | 'relist:<id>' while in flight
         notice: null, // the last purchase: { foodId, price }, { kind: 'bought-pack', pack }, or { kind, listing } for a listing
         error: null, // what the last request could not do
         listings: [], // other players' Resource listings for sale, newest first
         myListings: [], // this wallet's listings: up for sale, then the latest sold or cancelled
         storage: null, // { storage, used } of this wallet's Homestead, or null
         packsToday: {}, // { resource: packs this wallet bought from the app today }
+        browse: { query: '', category: 'all', sort: 'newest' }, // BUY's search, category chip and sort (kept for the session)
+        details: null, // the listing id whose DETAILS are open on BUY
+        editing: null, // the listing id being edited on SELL
       },
       breeding: null,
     };
