@@ -317,6 +317,92 @@ test('Resource listings in Postgres', { skip: !url && 'DATABASE_URL is not set' 
     await assert.rejects(pool.query("UPDATE market_listings SET status = 'active', closed_at = NULL WHERE id = $1", [listed.listingId]), /can never change/);
     await assert.rejects(pool.query("INSERT INTO market_listings (seller, resource, quantity, price) VALUES ('ut1sam', 'gold', 1, 1)"), /market_listings_values/);
   });
+
+  const relist = (owner, id, quantity, price, requestId) =>
+    marketplace.relistListing(pool, owner, owner.slice(3), id, { quantity, price, requestId }, T0);
+
+  await t.test('editing a listing replaces it: the old one is cancelled and points at the new one', async () => {
+    await reset();
+    await home('ut1sam', { wood: 20 });
+    const { listed } = await list('ut1sam', 'wood', 12, 30);
+    const r = await relist('ut1sam', listed.listingId, 12, 25, 'edit-req-0001');
+    assert.deepStrictEqual([r.relisted.resource, r.relisted.quantity, r.relisted.price, r.relisted.status, r.relisted.sellerName], ['wood', 12, 25, 'active', 'sam']);
+    assert.notStrictEqual(r.relisted.listingId, listed.listingId);
+    const old = (await pool.query('SELECT status, replaced_by FROM market_listings WHERE id = $1', [listed.listingId])).rows[0];
+    assert.deepStrictEqual([old.status, old.replaced_by], ['cancelled', r.relisted.listingId]);
+    assert.strictEqual((await storage('ut1sam')).wood, 8);
+    // The seller sees only the new listing: a replaced one isn't history.
+    assert.deepStrictEqual(r.myListings.map((l) => [l.listingId, l.status]), [[r.relisted.listingId, 'active']]);
+    assert.deepStrictEqual((await marketplace.getState(pool, null)).listings.map((l) => [l.listingId, l.price]), [[r.relisted.listingId, 25]]);
+    // The same tap again changes nothing more.
+    const again = await relist('ut1sam', listed.listingId, 12, 25, 'edit-req-0001');
+    assert.strictEqual(again.replayed, true);
+    assert.strictEqual((await pool.query("SELECT COUNT(*)::int AS n FROM market_listings WHERE status = 'active'")).rows[0].n, 1);
+    assert.strictEqual((await storage('ut1sam')).wood, 8);
+    // A replaced listing can't be edited, bought or cancelled again.
+    await assert.rejects(relist('ut1sam', listed.listingId, 5, 5), { code: 'listing_cancelled', status: 409 });
+    // replaced_by never changes on a closed listing.
+    await assert.rejects(pool.query('UPDATE market_listings SET replaced_by = NULL WHERE id = $1', [listed.listingId]), /can never change/);
+  });
+
+  await t.test('editing the quantity takes more from storage or gives the rest back', async () => {
+    await reset();
+    await home('ut1sam', { ore: 10 });
+    const { listed } = await list('ut1sam', 'ore', 4, 20);
+    assert.strictEqual((await storage('ut1sam')).ore, 6);
+    const up = await relist('ut1sam', listed.listingId, 10, 20);
+    assert.strictEqual((await storage('ut1sam')).ore, 0);
+    const down = await relist('ut1sam', up.relisted.listingId, 3, 20);
+    assert.strictEqual((await storage('ut1sam')).ore, 7);
+    // More than storage plus the listing holds: refused, nothing changed.
+    await assert.rejects(relist('ut1sam', down.relisted.listingId, 11, 20), { code: 'not_enough_resource', message: 'You have 10 Ore, counting this listing.' });
+    assert.strictEqual((await storage('ut1sam')).ore, 7);
+    assert.strictEqual((await pool.query('SELECT status FROM market_listings WHERE id = $1', [down.relisted.listingId])).rows[0].status, 'active');
+    // Cancelling the replacement gives back exactly what it holds.
+    await marketplace.cancelListing(pool, 'ut1sam', down.relisted.listingId, T0);
+    assert.strictEqual((await storage('ut1sam')).ore, 10);
+  });
+
+  await t.test('editing is refused for a sold listing, someone else\'s, bad values or no change', async () => {
+    await reset();
+    await home('ut1sam', { wood: 20 });
+    await home('ut1bea', {});
+    await fund('ut1bea', 100);
+    const a = (await list('ut1sam', 'wood', 5, 10)).listed;
+    await assert.rejects(relist('ut1bea', a.listingId, 5, 9), { code: 'not_your_listing', status: 403 });
+    await assert.rejects(relist('ut1sam', a.listingId, 5, 10), { code: 'no_change', status: 400 });
+    await assert.rejects(relist('ut1sam', a.listingId, 0, 10), { code: 'bad_quantity' });
+    await assert.rejects(relist('ut1sam', a.listingId, 5, mcfg.MAX_PRICE + 1), { code: 'bad_price' });
+    await assert.rejects(relist('ut1sam', 999999, 5, 10), { code: 'listing_missing', status: 404 });
+    await marketplace.buyListing(pool, 'ut1bea', 'bea', a.listingId, T0);
+    await assert.rejects(relist('ut1sam', a.listingId, 5, 9), { code: 'already_sold', status: 409 });
+    assert.strictEqual((await storage('ut1sam')).wood, 15);
+  });
+
+  await t.test('an edit racing a buy: exactly one of them happens', async () => {
+    for (let round = 0; round < 5; round++) {
+      await reset();
+      await home('ut1sam', { wood: 20 });
+      await home('ut1bea', {});
+      await fund('ut1bea', 100);
+      const { listed } = await list('ut1sam', 'wood', 10, 30);
+      const [bought, edited] = await Promise.allSettled([
+        marketplace.buyListing(pool, 'ut1bea', 'bea', listed.listingId, T0),
+        relist('ut1sam', listed.listingId, 10, 50),
+      ]);
+      assert.strictEqual([bought, edited].filter((r) => r.status === 'fulfilled').length, 1);
+      const rows = (await pool.query('SELECT status FROM market_listings ORDER BY id')).rows.map((r) => r.status);
+      if (bought.status === 'fulfilled') {
+        assert.strictEqual(edited.reason.code, 'already_sold');
+        assert.deepStrictEqual(rows, ['sold']);
+        assert.deepStrictEqual([(await storage('ut1sam')).wood, (await storage('ut1bea')).wood], [10, 10]);
+      } else {
+        assert.strictEqual(bought.reason.code, 'listing_cancelled');
+        assert.deepStrictEqual(rows, ['cancelled', 'active']);
+        assert.strictEqual(await stead.getSteadBalance(pool, 'ut1bea'), 100);
+      }
+    }
+  });
 });
 
 test('Resource packs in Postgres', { skip: !url && 'DATABASE_URL is not set' }, async (t) => {

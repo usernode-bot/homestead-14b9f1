@@ -539,6 +539,21 @@ app.post('/api/marketplace/listings', async (req, res) => {
   }
 });
 
+// Editing a listing (a new quantity or price) replaces it with a new listing,
+// once per requestId (lib/marketplace.js relistListing).
+app.post('/api/marketplace/listings/:id/relist', async (req, res) => {
+  const wallet = genesisWallet(req);
+  if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
+  const body = req.body || {};
+  try {
+    res.json(await marketplace.relistListing(pool, wallet, req.user.username, req.params.id, {
+      quantity: body.quantity, price: body.price, requestId: body.requestId,
+    }, req.now));
+  } catch (err) {
+    sendGenesisError(res, err);
+  }
+});
+
 app.post('/api/marketplace/listings/:id/:action(buy|cancel)', async (req, res) => {
   const wallet = genesisWallet(req);
   if (!wallet) return res.status(400).json({ error: 'no_wallet', message: 'Link a wallet to your Homeroom account first.' });
@@ -792,19 +807,40 @@ async function seedStagingContest() {
   await contests.accept(pool, b.wallet, b.user, sent.challenge.challengeId, ids[1], at, { contestId: STAGING_DEMO_CONTEST_ID });
 }
 
-// Two Resource listings from a fake seller (the second contest wallet), so
-// the Marketplace shows Resources for sale. Its storage is given the Resources
-// once, then they are listed through the real path. Never the visitor's.
-async function seedStagingMarket() {
-  const seller = STAGING_CONTEST_WALLETS[1];
-  const listed = await pool.query('SELECT 1 FROM market_listings WHERE seller = $1 LIMIT 1', [seller.wallet]);
-  if (listed.rows.length) return;
-  const opened = await homestead.open(pool, seller.wallet);
+// Resource listings from two fake sellers (the contest wallets), so the
+// Marketplace's BUY tab has something to search, filter and sort. Each
+// seller's storage is given the Resources once, then they are listed through
+// the real path. Never the visitor's or the demo wallet's.
+async function stagingListings(p, resources, listings) {
+  const opened = await homestead.open(pool, p.wallet);
   if (!opened.homestead) return;
-  const storage = Object.assign(require('./public/js/homestead-config').emptyStorage(), { wood: 12, crystal: 1 });
+  const storage = Object.assign(require('./public/js/homestead-config').emptyStorage(), opened.homestead.storage, resources);
   await pool.query('UPDATE homesteads SET storage = $2 WHERE id = $1', [opened.homestead.homesteadId, JSON.stringify(storage)]);
-  await marketplace.createListing(pool, seller.wallet, seller.user, { resource: 'wood', quantity: 12, price: 30, requestId: 'staging-listing-1' }, new Date());
-  await marketplace.createListing(pool, seller.wallet, seller.user, { resource: 'crystal', quantity: 1, price: 75, requestId: 'staging-listing-2' }, new Date());
+  for (const l of listings) {
+    await marketplace.createListing(pool, p.wallet, p.user, { resource: l[0], quantity: l[1], price: l[2], requestId: l[3] }, new Date());
+  }
+}
+async function seedStagingMarket() {
+  const [challenger, seller] = STAGING_CONTEST_WALLETS;
+  const listed = await pool.query('SELECT 1 FROM market_listings WHERE seller = $1 LIMIT 1', [seller.wallet]);
+  if (!listed.rows.length) {
+    await stagingListings(seller, { wood: 12, crystal: 1 }, [['wood', 12, 30, 'staging-listing-1'], ['crystal', 1, 75, 'staging-listing-2']]);
+  }
+  // More listings, added on their own key so a database seeded before has them too.
+  const more = await pool.query("SELECT 1 FROM market_listings WHERE seller = $1 AND request_key = 'staging-listing-3'", [seller.wallet]);
+  if (!more.rows.length) {
+    await stagingListings(seller, { stone: 6, rune: 3 }, [['stone', 6, 20, 'staging-listing-3'], ['rune', 3, 120, 'staging-listing-4']]);
+  }
+  const theirs = await pool.query("SELECT 1 FROM market_listings WHERE seller = $1 AND request_key = 'staging-listing-5'", [challenger.wallet]);
+  if (!theirs.rows.length) {
+    await stagingListings(challenger, { ore: 8, fish: 10, parts: 5, grain: 21 }, [
+      ['ore', 8, 24, 'staging-listing-5'], ['fish', 10, 35, 'staging-listing-6'],
+      ['parts', 5, 30, 'staging-listing-7'], ['grain', 20, 60, 'staging-listing-8'], ['grain', 1, 5, 'staging-listing-9'],
+    ]);
+    // One taken down again, so the seller has a cancelled listing too.
+    const last = await pool.query("SELECT id FROM market_listings WHERE seller = $1 AND request_key = 'staging-listing-9'", [challenger.wallet]);
+    if (last.rows[0]) await marketplace.cancelListing(pool, challenger.wallet, last.rows[0].id, new Date());
+  }
 }
 
 async function start() {

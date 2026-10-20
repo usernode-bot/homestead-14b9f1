@@ -10,12 +10,36 @@
 // Resource packs from the app and players' Resource listings work the same way: list, buy and cancel are one
 // request at a time, the server answers with the whole Marketplace again, and
 // a repeat is safe (a listing sells once). The sell form's typing is kept in
-// `form`, never in the store, so typing doesn't re-render.
+// `form`, never in the store, so typing doesn't re-render; so is an open
+// edit's typing (`editForm`). Editing a listing replaces it (relist).
+//
+// BUY's search, category and sort are in the store (marketplace.browse), so
+// changing them re-renders the list; they are kept in sessionStorage, so they
+// survive switching tabs, other screens and a reload, until the app closes.
 (function () {
   var store = window.HOMESTEAD_STORE;
   var wallet = window.HOMESTEAD_WALLET;
   var loadSeq = 0;
   var form = { resource: '', quantity: '', price: '' };
+  var editForm = { quantity: '', price: '' };
+  var BROWSE_KEY = 'homestead.market.browse';
+
+  function view() { return window.HOMESTEAD_MARKET_VIEW; }
+
+  function readBrowse() {
+    try {
+      var saved = JSON.parse(window.sessionStorage.getItem(BROWSE_KEY) || 'null');
+      return saved ? view().normalizeBrowse(saved) : null;
+    } catch (err) {
+      return null; // storage off or unreadable: start from the defaults
+    }
+  }
+  // Change BUY's search, category or sort, and keep it for the session.
+  function browse(patch) {
+    var next = view().normalizeBrowse(Object.assign({}, store.get().marketplace.browse, patch));
+    store.update('marketplace', { browse: next, details: null });
+    try { window.sessionStorage.setItem(BROWSE_KEY, JSON.stringify(next)); } catch (err) { /* not kept */ }
+  }
 
   // Without a connected wallet only what is for sale is shown.
   function apply(data) {
@@ -149,6 +173,49 @@
     });
   }
 
+  // EDIT on one of this wallet's listings (null closes it): the fields start
+  // at what the listing sells for now.
+  function editListing(id) {
+    var m = store.get().marketplace;
+    if (m.pending) return;
+    var l = id == null ? null : (m.myListings || []).find(function (x) { return Number(x.listingId) === id && x.status === 'active'; });
+    editForm = l ? { quantity: String(l.quantity), price: String(l.price) } : { quantity: '', price: '' };
+    store.update('marketplace', { editing: l ? id : null, notice: null, error: null });
+  }
+
+  // SAVE: the listing is replaced by one with the new quantity and price.
+  function saveEdit(id) {
+    var body = { quantity: Number(editForm.quantity), price: Number(editForm.price), requestId: newRequestId() };
+    send('relist:' + id, '/api/marketplace/listings/' + Number(id) + '/relist', body, function (data) {
+      store.update('marketplace', { editing: null });
+      return data.relisted ? { kind: 'relisted', listing: data.relisted } : null;
+    });
+  }
+
+  function toggleDetails(id) {
+    var m = store.get().marketplace;
+    store.update('marketplace', { details: Number(m.details) === id ? null : id });
+  }
+
+  // SELL on a storage row: that Resource, all of it, in the form below.
+  function prefill(resource) {
+    var select = document.getElementById('market-resource');
+    var option = select && select.querySelector('option[value="' + resource + '"]:not([disabled])');
+    if (!option) return;
+    var storage = store.get().marketplace.storage;
+    form.resource = resource;
+    form.quantity = String(Number(storage && storage.storage && storage.storage[resource]) || '');
+    select.value = resource;
+    var quantity = document.getElementById('market-quantity');
+    if (quantity) quantity.value = form.quantity;
+    updateSummary(document);
+    var price = document.getElementById('market-price');
+    if (price) {
+      price.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      price.focus({ preventScroll: true });
+    }
+  }
+
   function buyListing(id) {
     send('buy-listing:' + id, '/api/marketplace/listings/' + Number(id) + '/buy', {}, function (data) {
       return data.boughtListing ? { kind: 'bought-listing', listing: data.boughtListing } : null;
@@ -163,6 +230,35 @@
 
   function who(username, address) {
     return username ? '@' + username : wallet.shortAddress(address);
+  }
+
+  // The line under the sell form: what LIST FOR SALE will publish, as text.
+  function updateSummary(root) {
+    var el = (root || document).querySelector('[data-market-summary]');
+    if (!el) return;
+    var v = view();
+    var storage = store.get().marketplace.storage;
+    var have = Number(storage && storage.storage && storage.storage[form.resource]) || 0;
+    var quantity = Number(form.quantity);
+    var price = Number(form.price);
+    var label = v.resourceLabel(form.resource);
+    var text;
+    var warn = false;
+    if (!form.resource || !(quantity >= 1) || !(price >= 1) || !Number.isInteger(quantity) || !Number.isInteger(price)) {
+      text = 'Enter how many and a price to see your listing.';
+    } else if (quantity > have) {
+      text = 'You have ' + have.toLocaleString('en-US') + ' ' + label + '.';
+      warn = true;
+    } else {
+      text = 'You\'ll list ' + quantity.toLocaleString('en-US') + ' ' + label + ' for ' + v.steadAmount(price) +
+        ' (' + v.formatEach(v.priceEach(price, quantity)) + ' STEAD each).';
+      var pack = window.HOMESTEAD_MARKET_CONFIG.pack(form.resource);
+      if (pack) text += ' The app\'s pack is ' + v.formatEach(v.priceEach(pack.price, pack.size)) + ' STEAD each.';
+    }
+    el.textContent = text;
+    el.classList.toggle('text-danger', warn);
+    el.classList.toggle('text-fg', !warn && text.indexOf('You\'ll') === 0);
+    el.classList.toggle('text-muted', !warn && text.indexOf('You\'ll') !== 0);
   }
 
   // After a render: players' names go in as text, and what was typed goes
@@ -192,23 +288,45 @@
     if (quantity) quantity.value = form.quantity;
     var price = root.querySelector('#market-price');
     if (price) price.value = form.price;
+    updateSummary(root);
+    var editQuantity = root.querySelector('#market-edit-quantity');
+    if (editQuantity) editQuantity.value = editForm.quantity;
+    var editPrice = root.querySelector('#market-edit-price');
+    if (editPrice) editPrice.value = editForm.price;
+    // BUY's search, and what was searched for in "Nothing matches", as text.
+    var b = m.browse || {};
+    var search = root.querySelector('#market-search');
+    if (search && search.value !== (b.query || '')) search.value = b.query || '';
+    root.querySelectorAll('[data-market-query]').forEach(function (el) {
+      el.textContent = b.query ? '\u2018' + b.query + '\u2019' : 'these filters';
+    });
   }
 
+  function typed(e) {
+    var data = e.target && e.target.dataset;
+    if (!data) return;
+    if (data.marketInput) { form[data.marketInput] = e.target.value; updateSummary(document); }
+    if (data.marketEdit) editForm[data.marketEdit] = e.target.value;
+  }
   document.addEventListener('input', function (e) {
-    var key = e.target && e.target.dataset && e.target.dataset.marketInput;
-    if (key) form[key] = e.target.value;
+    typed(e);
+    if (e.target && e.target.dataset && e.target.dataset.marketBrowse === 'query') browse({ query: e.target.value });
   });
   document.addEventListener('change', function (e) {
-    var key = e.target && e.target.dataset && e.target.dataset.marketInput;
-    if (key) form[key] = e.target.value;
+    typed(e);
+    if (e.target && e.target.dataset && e.target.dataset.marketBrowse === 'sort') browse({ sort: e.target.value });
   });
   document.addEventListener('submit', function (e) {
     if (e.target && e.target.id === 'market-sell-form') { e.preventDefault(); listResources(); }
+    if (e.target && e.target.id === 'market-edit-form') { e.preventDefault(); saveEdit(Number(e.target.dataset.listingId)); }
   });
 
+  // Leaving a screen closes its messages, an open edit and open DETAILS.
   function clearMessages() {
     var m = store.get().marketplace;
-    if (m.notice || m.error) store.update('marketplace', { notice: null, error: null });
+    if (m.notice || m.error || m.editing != null || m.details != null) {
+      store.update('marketplace', { notice: null, error: null, editing: null, details: null });
+    }
   }
 
   // Forget this wallet's food on this device when it disconnects or changes.
@@ -219,12 +337,17 @@
     lastWallet = key;
     if (state.marketplace.status !== 'idle' || state.marketplace.notice || state.marketplace.error) {
       loadSeq++;
-      store.update('marketplace', store.createInitialState().marketplace);
+      // The search, category and sort are this device's, not the wallet's.
+      store.update('marketplace', Object.assign(store.createInitialState().marketplace, { browse: state.marketplace.browse }));
     }
   });
+
+  var saved = readBrowse();
+  if (saved) store.update('marketplace', { browse: saved });
 
   window.HOMESTEAD_MARKETPLACE = {
     load: load, ensure: ensure, forget: forget, buy: buy, clearMessages: clearMessages,
     buyPack: buyPack, buyListing: buyListing, cancelListing: cancelListing, fillForm: fillForm,
+    editListing: editListing, toggleDetails: toggleDetails, browse: browse, prefill: prefill,
   };
 })();

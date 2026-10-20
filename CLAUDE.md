@@ -196,6 +196,16 @@ transactions do not exist yet, and none may be faked.
   `LISTING-<id>`. Own listings, too little STEAD, no storage room and sold
   listings are refused with nothing changed; cancelling returns the lot to
   storage. No fee. Limits are only in `public/js/market-config.js`.
+  Editing a listing (`relistListing`) never changes it: in one transaction
+  it cancels the listing (`replaced_by` points at the new one) and lists the
+  new quantity and price in its place, so a buyer always pays for exactly
+  what was shown.
+- **Marketplace screen:** two tabs, BUY (`/marketplace`: search, category
+  chips, sort over what the server answered; player listings, packs, food)
+  and SELL (`/marketplace/sell`: storage, the listing form, your listings
+  with EDIT and CANCEL). `public/js/market-view.js` draws both;
+  `public/js/marketplace.js` keeps BUY's search, chip and sort in
+  `marketplace.browse` and in sessionStorage for the session.
 - **Resource packs:** the app also sells every Resource as a fixed pack for
   STEAD (`market-config.js` PACKS: size, price, perDay, PROVISIONAL, change
   them only there; every `homestead-config.js` RESOURCES key needs one).
@@ -224,7 +234,7 @@ transactions do not exist yet, and none may be faked.
   it falls back to a random mock address.
 - **Screens:** `public/js/screens.js` (one render function per route),
   `public/js/app.js` (router, nav, wallet area). Routes are clean paths
-  (`/`, `/creature`, `/homestead`, `/contests`, `/marketplace`, `/collection`,
+  (`/`, `/creature`, `/homestead`, `/contests`, `/marketplace`, `/marketplace/sell`, `/collection`,
   `/profile`, `/contests/<id>` under CONTESTS); the server's catch-all serves
   `index.html` for each. The top menu (`NAV` in screens.js) is HOME, MY
   HOMESTEAD, CONTESTS, MARKETPLACE: MY HOMESTEAD's page carries the tabs

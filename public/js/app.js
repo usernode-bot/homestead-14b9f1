@@ -38,6 +38,11 @@
     if (cm) {
       return { path: path, key: 'contestById', label: 'BATTLE', nav: screens.ROUTES.find(function (r) { return r.key === 'contests'; }), contestId: Number(cm[1]) };
     }
+    // The Marketplace's SELL tab; /marketplace itself is BUY.
+    if (path === '/marketplace/sell') {
+      var marketRoute = screens.ROUTES.find(function (r) { return r.key === 'marketplace'; });
+      return { path: path, key: 'marketplace', tab: 'sell', label: 'MARKETPLACE', nav: marketRoute };
+    }
     // The Gear inventory is opened from the Homestead, and sits under it.
     if (path === '/gear') {
       return { path: path, key: 'gear', label: 'GEAR', nav: screens.ROUTES.find(function (r) { return r.key === 'homestead'; }) };
@@ -57,7 +62,7 @@
     var c = store.get().contests;
     var waiting = store.get().wallet.status === 'connected' && c.status === 'ready' ? c.incoming.length : 0;
     navEl.innerHTML = screens.NAV.map(function (r) {
-      var current = r.key === 'mine' ? inMyHomestead(route) : r === route || (r === route.nav && route.contestId);
+      var current = r.key === 'mine' ? inMyHomestead(route) : r === route || (r === route.nav && (route.contestId || route.key === 'marketplace'));
       return '<li class="min-w-0 flex-auto sm:flex-none"><a href="' + r.path + '" data-nav class="nav-tab nav-tab-main"' + (r.key === 'mine' ? ' data-nav-mine' : '') +
         (r.short !== r.label ? ' aria-label="' + r.label + '"' : '') +
         (current ? ' aria-current="page"' : '') + '>' +
@@ -213,7 +218,7 @@
     market.clearMessages();
     refreshCreature();
     // The Marketplace shows this wallet's STEAD and food as they now are.
-    if (path === '/marketplace' && store.get().marketplace.status === 'ready') market.load();
+    if ((path === '/marketplace' || path === '/marketplace/sell') && store.get().marketplace.status === 'ready') market.load();
     if (CONTEST_PATH.test(path)) contests.view(Number(CONTEST_PATH.exec(path)[1]), true, true);
     render();
     window.scrollTo(0, 0);
@@ -253,6 +258,12 @@
       else if (name === 'buy-pack') market.buyPack(action.dataset.pack);
       else if (name === 'buy-listing') market.buyListing(Number(action.dataset.listingId));
       else if (name === 'cancel-listing') market.cancelListing(Number(action.dataset.listingId));
+      else if (name === 'edit-listing') market.editListing(Number(action.dataset.listingId));
+      else if (name === 'edit-listing-back') market.editListing(null);
+      else if (name === 'market-details') market.toggleDetails(Number(action.dataset.listingId));
+      else if (name === 'market-category') market.browse({ category: action.dataset.category });
+      else if (name === 'market-clear') market.browse({ query: '', category: 'all' });
+      else if (name === 'market-sell-resource') market.prefill(action.dataset.resource);
       else if (name === 'train') creatures.train(action.dataset.stat);
       else if (name === 'gear-claim') gear.claim();
       else if (name === 'gear-retry') gear.load();

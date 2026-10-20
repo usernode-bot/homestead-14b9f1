@@ -133,6 +133,7 @@
       "visual": true,
       "impact": [
         "public/js/marketplace.js",
+        "public/js/market-view.js",
         "public/js/food-config.js",
         "public/js/market-config.js",
         "lib/marketplace.js",
@@ -141,28 +142,40 @@
       ]
     },
     {
-      "name": "Marketplace shows players' Resource listings with their STEAD price and seller",
+      "id": "marketplace.buy",
+      "name": "Marketplace opens on BUY with search, category chips and compact listing rows",
       "path": "/marketplace",
-      "expectSelector": "[data-market-listings] [data-listing][data-listing-resource=\"wood\"] [data-listing-price=\"30\"]",
-      "expectText": "Sold by @staging-demo-rival"
+      "expectSelector": "[data-market-tabs] [data-market-tab=\"buy\"][aria-current=\"page\"]",
+      "expectText": "BUY",
+      "visual": true,
+      "impact": [
+        "public/js/app.js",
+        "public/js/marketplace.js",
+        "public/js/market-view.js",
+        "public/js/food-config.js",
+        "public/js/market-config.js",
+        "lib/marketplace.js",
+        "public/js/screens.js",
+        "styles/**"
+      ]
     },
     {
-      "name": "Marketplace puts a player's Wood listing under Lumber Camp",
+      "name": "Marketplace BUY shows a player's Wood listing with its category, STEAD price and seller",
       "path": "/marketplace",
-      "expectSelector": "[data-market-listings] [data-market-category=\"lumber-camp\"] [data-market-resource=\"wood\"] [data-listing-resource=\"wood\"] [data-listing-price=\"30\"]",
-      "expectText": "Lumber Camp"
+      "expectSelector": "[data-market-listings] [data-listing][data-listing-resource=\"wood\"][data-market-category=\"lumber-camp\"] [data-listing-price=\"30\"]",
+      "expectText": "@staging-demo-rival"
     },
     {
-      "name": "Marketplace lists every Resource for sale under its category, listed or not",
+      "name": "Marketplace BUY sells a pack of every Resource from the app, with its category",
       "path": "/marketplace",
-      "expectSelector": "[data-market-listings] [data-market-category=\"mystic-shrine\"] [data-market-resource=\"rune\"][data-listing-count=\"0\"]",
-      "expectText": "Mystic Shrine"
-    },
-    {
-      "name": "Marketplace sells a pack of every Resource from the app, grouped by category",
-      "path": "/marketplace",
-      "expectSelector": "[data-market-packs] [data-market-category=\"mystic-shrine\"] [data-pack=\"rune\"] [data-pack-price=\"50\"]",
+      "expectSelector": "[data-market-packs] [data-pack=\"rune\"][data-market-category=\"mystic-shrine\"] [data-pack-price=\"50\"]",
       "expectText": "Resource packs"
+    },
+    {
+      "name": "Marketplace SELL tab is its own page",
+      "path": "/marketplace/sell",
+      "expectSelector": "[data-market-tabs] [data-market-tab=\"sell\"][aria-current=\"page\"]",
+      "expectText": "SELL"
     },
     {
       "name": "Collection placeholder",
