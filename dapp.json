@@ -23,6 +23,12 @@
       ]
     },
     {
+      "name": "Home shows quick links to MY HOMESTEAD, BATTLE and MARKETPLACE",
+      "path": "/",
+      "expectSelector": "[data-quick-links] [data-quick-link=\"marketplace\"]",
+      "expectText": "MARKETPLACE"
+    },
+    {
       "name": "The header shows CONNECT until a wallet connects",
       "path": "/",
       "expectSelector": "#wallet [data-action=\"connect\"]",
