@@ -395,8 +395,8 @@
     return '<span class="font-black tabular-nums" data-profile-stead="' + s.steadBalance + '">' + steadAmount(s.steadBalance) + '</span>';
   }
 
-  // How to play: the goal and the core loop, closed until opened so it never
-  // pushes Genesis and the Daily Check-in down. app.js keeps it open across
+  // How to play: the goal and the core loop. On Home it sits below the Daily
+  // Check-in and stays closed until opened. app.js keeps it open across
   // re-renders. Every number comes from the config files.
   function howToPlay() {
     var contestConfig = window.HOMESTEAD_CONTEST_CONFIG;
@@ -424,12 +424,26 @@
     '</details>';
   }
 
+  // Quick links on Home to the rest of the top menu, named as in NAV.
+  function quickLinks() {
+    return '<nav aria-label="Quick links" class="mt-4 max-w-2xl">' +
+      '<ul class="list grid grid-cols-3 divide-x divide-y-0" data-quick-links>' +
+        NAV.slice(1).map(function (r) {
+          return '<li><a href="' + r.path + '" data-nav data-quick-link="' + r.key + '" class="list-row h-full flex-col justify-center gap-1 px-2 text-center hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus">' +
+            icon(r.icon || r.key, 'h-5 w-5 shrink-0 text-punk') +
+            '<span class="text-small font-bold">' + r.label + '</span>' +
+          '</a></li>';
+        }).join('') +
+      '</ul>' +
+    '</nav>';
+  }
+
   function home(state) {
     return '' +
-      '<section class="grid items-center gap-8 py-4 md:grid-cols-5 md:py-10">' +
+      '<section class="grid gap-4 py-2 md:grid-cols-5 md:items-center md:gap-8 md:py-10">' +
         '<div class="md:col-span-3">' +
           '<h1 class="text-display">HOMESTEAD</h1>' +
-          '<p class="mt-4 text-title font-black leading-tight tracking-tight">' +
+          '<p class="mt-2 text-heading font-black leading-tight tracking-tight md:mt-4 md:text-title md:leading-tight">' +
             '<span class="block">Awaken a Monster.</span>' +
             '<span class="block">Give it a Home.</span>' +
             '<span class="block text-accent">Make it Yours.</span>' +
@@ -438,10 +452,11 @@
         // This wallet's Creatures, out of the most one wallet can hold.
         '<div class="md:col-span-2">' + creatureCountCard(state) + '</div>' +
       '</section>' +
-      '<div class="mt-4 max-w-2xl">' + howToPlay() + '</div>' +
-      '<div class="mt-6 max-w-2xl">' + genesisPanel(state) + '</div>' +
-      '<div class="mt-10 max-w-2xl">' + checkInCard(state) + '</div>' +
-      '<section class="mt-10 max-w-2xl">' +
+      '<div class="mt-4 max-w-2xl md:mt-6">' + genesisPanel(state) + '</div>' +
+      quickLinks() +
+      '<div class="mt-8 max-w-2xl md:mt-10">' + checkInCard(state) + '</div>' +
+      '<div class="mt-6 max-w-2xl">' + howToPlay() + '</div>' +
+      '<section class="mt-8 max-w-2xl md:mt-10">' +
         '<h2 class="section-label">About the game</h2>' +
         '<ul class="list">' +
           '<li class="list-row items-start">' + icon('creature', 'mt-0.5 h-5 w-5 shrink-0 text-punk') + '<p class="text-body">HOMESTEAD is a collectible game about cute, strange punk monsters.</p></li>' +
